@@ -1,0 +1,24 @@
+name: Lint
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  openapi:
+    name: OpenAPI document
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      # Redocly's recommended rules, every warning an error (redocly.yaml).
+      - run: npx --yes @redocly/cli@2.64.1 lint openapi.json
+        env:
+          REDOCLY_TELEMETRY: "off"
+          REDOCLY_SUPPRESS_UPDATE_NOTICE: "true"

@@ -1,0 +1,2493 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Anywhere agent API",
+    "version": "1.0.0",
+    "description": "Read and change a person's Anywhere map: the places they saved and the ones they go to, their visits and trips (all of their history), and where they are now.\n\n**Authentication.** Every call carries the person's personal token, made in the Anywhere app: `Authorization: Bearer anyw_pat_…`. The same token connects an MCP client to `https://anywhere.fenn.chat/mcp` (Streamable HTTP), whose tools are these operations under the same names.\n\n**The person is told.** Every call that reads or changes their places, history or location is recorded and shown to them in the app. Every change can be undone there.\n\n**Limits,** per token: 1000 calls a day (UTC) and 60 a minute, 200 changes to the map a day; 429 with Retry-After beyond them.\n\n**Conventions.** Times are ISO 8601 in UTC, to the millisecond; coordinates WGS84 degrees. Lists come in pages of up to 200 items: pass `next_cursor` as `cursor` for the next, with the same filters. GET answers carry an ETag (If-None-Match gives 304 while it holds); `updated_since` lists what changed since a time. Errors are `{ \"error\": { \"code\", \"message\" } }`. Adding a place takes an Idempotency-Key.",
+    "contact": {
+      "name": "Anywhere agent API",
+      "url": "https://github.com/fenn-chat/anywhere-api"
+    },
+    "license": {
+      "name": "MIT",
+      "identifier": "MIT"
+    }
+  },
+  "externalDocs": {
+    "description": "Guides, examples (curl, Python, TypeScript) and MCP setup",
+    "url": "https://github.com/fenn-chat/anywhere-api"
+  },
+  "servers": [
+    {
+      "url": "https://anywhere.fenn.chat/api/v1"
+    }
+  ],
+  "security": [
+    {
+      "personalToken": []
+    }
+  ],
+  "tags": [
+    {
+      "name": "Person",
+      "description": "Who the person is, and this connection's limits and usage"
+    },
+    {
+      "name": "Places",
+      "description": "The places on the person's map: searched, read, saved, changed, taken off"
+    },
+    {
+      "name": "History",
+      "description": "Every visit and trip the person made, in ranges and pages"
+    },
+    {
+      "name": "Location",
+      "description": "Where the person is now"
+    }
+  ],
+  "paths": {
+    "/me": {
+      "get": {
+        "operationId": "get_me",
+        "tags": [
+          "Person"
+        ],
+        "summary": "Who the person is",
+        "description": "The person (their name, and the time zone to show times in) and this connection: its agent, its limits and what it used today.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Me"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/places": {
+      "get": {
+        "operationId": "list_places",
+        "tags": [
+          "Places"
+        ],
+        "summary": "Search the person's places",
+        "description": "The places on the person's map: saved ones (in a list, favorite or wantToGo, or none) and ones they go to without saving them (home, work…). Latest change first, or nearest first with `near`. Each has its label, private note, origin and visit stats. Filters combine; follow `next_cursor` for more.",
+        "parameters": [
+          {
+            "name": "status",
+            "in": "query",
+            "required": false,
+            "description": "Only these: favorite or wantToGo (the person's lists), saved (saved without a list), unconfirmed (the yellow ?: venue to confirm)",
+            "schema": {
+              "type": "string",
+              "enum": [
+                "favorite",
+                "wantToGo",
+                "saved",
+                "unconfirmed"
+              ]
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "description": "Words to find in names, addresses, categories, labels and notes, ignoring case and accents",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "bbox",
+            "in": "query",
+            "required": false,
+            "description": "A box: min_lat,min_lng,max_lat,max_lng in degrees; a min_lng east of max_lng crosses the antimeridian",
+            "schema": {
+              "type": "string",
+              "pattern": "^-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?$"
+            }
+          },
+          {
+            "name": "near",
+            "in": "query",
+            "required": false,
+            "description": "A point, lat,lng in degrees: the places within radius_m of it, nearest first",
+            "schema": {
+              "type": "string",
+              "pattern": "^-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?$"
+            }
+          },
+          {
+            "name": "radius_m",
+            "in": "query",
+            "required": false,
+            "description": "With near: how far, in meters (1000 by default, 100000 at most)",
+            "schema": {
+              "type": "number",
+              "exclusiveMinimum": 0,
+              "maximum": 100000
+            }
+          },
+          {
+            "name": "updated_since",
+            "in": "query",
+            "required": false,
+            "description": "Only what changed since then, for incremental sync: the places found that changed, and in `removed` the ids that changed and are no longer found (taken off the map, or no longer matching the other filters). Pass the newest `updated_at` or `removed_at` your copy holds (the server's times), not your own clock's",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "string",
+                  "format": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Items per page, at most 200",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `next_cursor` of the previous page, with the same filters",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PlacePage"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "post": {
+        "operationId": "add_place",
+        "tags": [
+          "Places"
+        ],
+        "summary": "Save a place",
+        "description": "Saves a venue on the person's map, in a list (favorite, wantToGo) or none, with a note. A venue already on the map (the same provider id, or the same name within 100 m) is never added twice: that place takes the stronger status and the note. The person is told, and can undo it in the app.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "A key of your own for this request (a UUID): a retry with the same key and the same input answers the first response again, without a second change",
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7E]{1,255}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200,
+                    "description": "The venue's name"
+                  },
+                  "lat": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                  },
+                  "lng": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180
+                  },
+                  "address": {
+                    "type": "string",
+                    "maxLength": 500
+                  },
+                  "category": {
+                    "description": "Its category, which picks the pin's icon",
+                    "type": "string",
+                    "enum": [
+                      "airport",
+                      "park",
+                      "nationalPark",
+                      "statePark",
+                      "campus",
+                      "resort",
+                      "hotel",
+                      "museum",
+                      "beach",
+                      "stadium",
+                      "university",
+                      "hospital",
+                      "mall",
+                      "themePark",
+                      "amusementPark",
+                      "fairground",
+                      "zoo",
+                      "marina",
+                      "harbor",
+                      "harbour",
+                      "golfCourse",
+                      "skiResort",
+                      "restaurant",
+                      "cafe",
+                      "bakery",
+                      "store",
+                      "foodMarket",
+                      "gasStation",
+                      "pharmacy",
+                      "fitnessCenter",
+                      "library",
+                      "theater",
+                      "movieTheater",
+                      "nightlife",
+                      "brewery",
+                      "winery",
+                      "aquarium",
+                      "campground",
+                      "school",
+                      "conventionCenter",
+                      "carRental",
+                      "publicTransport",
+                      "home",
+                      "work",
+                      "other"
+                    ]
+                  },
+                  "provider_ids": {
+                    "description": "The venue's ids, primary first: one already on the map makes this that place",
+                    "maxItems": 8,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "pattern": "^(apple|google):[^\\n]+$",
+                      "description": "apple:<Apple Maps id> or google:<Google place id>"
+                    }
+                  },
+                  "status": {
+                    "description": "favorite or wantToGo; saved without a list when left out",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "favorite",
+                          "wantToGo"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "note": {
+                    "description": "The person's note on the place, up to 4000 characters",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 4000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "name",
+                  "lat",
+                  "lng"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Merged: the venue was on the map already",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created: a new place (Location names it)",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/places/{place_id}": {
+      "get": {
+        "operationId": "get_place",
+        "tags": [
+          "Places"
+        ],
+        "summary": "Read a place",
+        "description": "One place of the person's map, by its id: its status, label, private note, origin and visit stats.",
+        "parameters": [
+          {
+            "name": "place_id",
+            "in": "path",
+            "required": true,
+            "description": "A place's id, from list_places",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Place"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "update_place",
+        "tags": [
+          "Places"
+        ],
+        "summary": "Change a place",
+        "description": "Changes what is given of a place: a saved place's status, note or name; the label (home, work, school) of a place the person has been to. The person is told, and can undo a status, note or name in the app.",
+        "parameters": [
+          {
+            "name": "place_id",
+            "in": "path",
+            "required": true,
+            "description": "A place's id, from list_places",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "description": "favorite, wantToGo, or null for no list",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "favorite",
+                          "wantToGo"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "note": {
+                    "description": "The person's note; null or blank clears it",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 4000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "name": {
+                    "description": "A new name",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "label": {
+                    "description": "home, work or school, or null for none of them: only a place the person has been to takes one. A place on the map for its label alone (too short a stay for a pin) leaves it without one: outcome removed",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "home",
+                          "work",
+                          "school"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "minProperties": 1,
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "remove_place",
+        "tags": [
+          "Places"
+        ],
+        "summary": "Take a place off the map",
+        "description": "Takes a saved place off the person's map. The person is told, and can undo it in the app.",
+        "parameters": [
+          {
+            "name": "place_id",
+            "in": "path",
+            "required": true,
+            "description": "A place's id, from list_places",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WriteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/places/{place_id}/visits": {
+      "get": {
+        "operationId": "list_place_visits",
+        "tags": [
+          "History"
+        ],
+        "summary": "List a place's visits",
+        "description": "Every visit to a place, newest first, however old, or those going on in a range (from, to).",
+        "parameters": [
+          {
+            "name": "place_id",
+            "in": "path",
+            "required": true,
+            "description": "Only the visits to this place, from list_places",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "The visits going on at or after this time",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "string",
+                  "format": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "The visits begun before this time",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "string",
+                  "format": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "bbox",
+            "in": "query",
+            "required": false,
+            "description": "Only the visits to places in this box: min_lat,min_lng,max_lat,max_lng",
+            "schema": {
+              "type": "string",
+              "pattern": "^-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Items per page, at most 200",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `next_cursor` of the previous page, with the same filters",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitPage"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/visits": {
+      "get": {
+        "operationId": "list_visits",
+        "tags": [
+          "History"
+        ],
+        "summary": "List the person's visits",
+        "description": "The person's stays at places, newest first: every one ever recorded, or those going on in a range (from, to), to one place (place_id) or to the places in a box (bbox). Each names its place as the map does.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "The visits going on at or after this time",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "string",
+                  "format": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "The visits begun before this time",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "string",
+                  "format": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "place_id",
+            "in": "query",
+            "required": false,
+            "description": "Only the visits to this place, from list_places",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "bbox",
+            "in": "query",
+            "required": false,
+            "description": "Only the visits to places in this box: min_lat,min_lng,max_lat,max_lng",
+            "schema": {
+              "type": "string",
+              "pattern": "^-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?$"
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Items per page, at most 200",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `next_cursor` of the previous page, with the same filters",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/VisitPage"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/trips": {
+      "get": {
+        "operationId": "list_trips",
+        "tags": [
+          "History"
+        ],
+        "summary": "List the person's trips",
+        "description": "The person's trips, newest first, or those going on in a range (from, to): when, from where to where, how (walking, driving…) and how far. Never a route.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "The trips going on at or after this time",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "string",
+                  "format": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "The trips begun before this time",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "string",
+                  "format": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Items per page, at most 200",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `next_cursor` of the previous page, with the same filters",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TripPage"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/history": {
+      "get": {
+        "operationId": "get_history",
+        "tags": [
+          "History"
+        ],
+        "summary": "Read the person's history",
+        "description": "The person's visits and trips as one timeline, newest first, or what went on in a range (from, to).",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "What went on at or after this time",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "string",
+                  "format": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "What began before this time",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "string",
+                  "format": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Items per page, at most 200",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `next_cursor` of the previous page, with the same filters",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HistoryPage"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/location": {
+      "get": {
+        "operationId": "get_current_location",
+        "tags": [
+          "Location"
+        ],
+        "summary": "Where the person is now",
+        "description": "Where the person is, as their phone last reported it: at a place (which, since when) or moving (the trip, its predicted destination and arrival), with the last coordinate and its accuracy. location_not_shared (404) while their phone has shared none.",
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Location"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "personalToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "A personal token (anyw_pat_…) the person made in the Anywhere app"
+      }
+    },
+    "schemas": {
+      "Place": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The place's id: a saved place's own, or, for a place the person goes to without having saved it, the location engine's"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "saved",
+              "visited"
+            ],
+            "description": "saved: on the map because it was saved (by the person, an agent, a chat or an import). visited: on the map because the person goes there (a home, a workplace, a café they stayed at) without having saved it"
+          },
+          "name": {
+            "description": "What the place is called; null for a visited place nothing named yet",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "lng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          },
+          "address": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "category": {
+            "description": "Its category: restaurant, cafe, park, museum, hotel…",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "provider_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "The venue's ids at Apple Maps (apple:<id>) and Google (google:<place id>)"
+          },
+          "status": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "favorite",
+                  "wantToGo"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The person's list: favorite, wantToGo, or null for saved without a list (always null for a visited place)"
+          },
+          "unconfirmed": {
+            "type": "boolean",
+            "description": "Shown with a yellow ? on the map: which venue it is waits for the person's confirmation"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "home",
+                  "work",
+                  "school"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The person's home, work or school: the label they gave it, or the one their stays there earned"
+          },
+          "note": {
+            "description": "The person's private note on it; saved places only",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "origin": {
+            "type": "object",
+            "properties": {
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "me",
+                  "agent",
+                  "chat",
+                  "screenshot",
+                  "import",
+                  "visit"
+                ],
+                "description": "me: the person, in the app. agent: an agent, named (Fenn, the app's own, or an outside one like you). chat: a place a chat message named. screenshot: a screenshot shared in the app. import: brought from Google Maps. visit: a place the person went to."
+              },
+              "name": {
+                "description": "The agent's name, for kind agent",
+                "type": "string"
+              }
+            },
+            "required": [
+              "kind"
+            ],
+            "additionalProperties": false,
+            "description": "Who put the place on the map; it never changes"
+          },
+          "visit_count": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Times the person has been there, over all their history"
+          },
+          "total_time_s": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Time spent there, in seconds"
+          },
+          "first_visit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the first visit began"
+          },
+          "last_visit": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When the last visit ended (began, while it goes on)"
+          },
+          "nights": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Nights spent there"
+          },
+          "distance_m": {
+            "description": "Meters from `near`, in a search near a point",
+            "type": "number",
+            "minimum": 0
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "When it was saved; null for a visited place"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When anything about it last changed, its visits included: the time `updated_since` compares"
+          }
+        },
+        "required": [
+          "id",
+          "kind",
+          "name",
+          "lat",
+          "lng",
+          "address",
+          "category",
+          "provider_ids",
+          "status",
+          "unconfirmed",
+          "label",
+          "note",
+          "origin",
+          "visit_count",
+          "total_time_s",
+          "first_visit",
+          "last_visit",
+          "nights",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "description": "A place on the person's map: one they saved, or one they go to"
+      },
+      "RemovedPlace": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "removed_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "Its latest change: when it left the map, or the search"
+          }
+        },
+        "required": [
+          "id",
+          "removed_at"
+        ],
+        "additionalProperties": false,
+        "description": "With `updated_since`: an id that changed since then and is not among the places found, taken off the map or no longer matching the search. Delete it from your copy; you may never have had it"
+      },
+      "PlaceRef": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "description": "The place on the map it is (GET /places/{id}); null when no pin stands for it: a short stop, a place the person hid",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "home",
+                  "work",
+                  "school"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "category": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90
+          },
+          "lng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "label",
+          "category",
+          "lat",
+          "lng"
+        ],
+        "additionalProperties": false,
+        "description": "A place, as a visit or a trip names it"
+      },
+      "Visit": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlaceRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where; null when that place is gone"
+          },
+          "arrival": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "departure": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null while the person is still there"
+          },
+          "duration_s": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Seconds there; null while it goes on"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "place",
+          "arrival",
+          "departure",
+          "duration_s",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "description": "One stay at a place"
+      },
+      "Trip": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "duration_s": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "origin": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlaceRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where it began; null when unknown"
+          },
+          "destination": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/PlaceRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Where it ended; null when unknown"
+          },
+          "mode": {
+            "description": "How the person mostly moved: walking, running, cycling, automotive…; null when unsure",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "distance_m": {
+            "type": "number",
+            "minimum": 0
+          },
+          "stops": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "start": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "end": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "place": {
+                  "anyOf": [
+                    {
+                      "$ref": "#/components/schemas/PlaceRef"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "start",
+                "end",
+                "place"
+              ],
+              "additionalProperties": false
+            },
+            "description": "Stops too short to end the trip"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "start",
+          "end",
+          "duration_s",
+          "origin",
+          "destination",
+          "mode",
+          "distance_m",
+          "stops",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "description": "A trip's summary (never its route)"
+      },
+      "HistoryItem": {
+        "oneOf": [
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "place": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PlaceRef"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Where; null when that place is gone"
+              },
+              "arrival": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "departure": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "null while the person is still there"
+              },
+              "duration_s": {
+                "anyOf": [
+                  {
+                    "type": "integer",
+                    "minimum": 0
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Seconds there; null while it goes on"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "type": {
+                "type": "string",
+                "const": "visit"
+              }
+            },
+            "required": [
+              "id",
+              "place",
+              "arrival",
+              "departure",
+              "duration_s",
+              "updated_at",
+              "type"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "start": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "end": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "duration_s": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "origin": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PlaceRef"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Where it began; null when unknown"
+              },
+              "destination": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/PlaceRef"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "description": "Where it ended; null when unknown"
+              },
+              "mode": {
+                "description": "How the person mostly moved: walking, running, cycling, automotive…; null when unsure",
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "distance_m": {
+                "type": "number",
+                "minimum": 0
+              },
+              "stops": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "start": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "end": {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    "place": {
+                      "anyOf": [
+                        {
+                          "$ref": "#/components/schemas/PlaceRef"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    }
+                  },
+                  "required": [
+                    "start",
+                    "end",
+                    "place"
+                  ],
+                  "additionalProperties": false
+                },
+                "description": "Stops too short to end the trip"
+              },
+              "updated_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "type": {
+                "type": "string",
+                "const": "trip"
+              }
+            },
+            "required": [
+              "id",
+              "start",
+              "end",
+              "duration_s",
+              "origin",
+              "destination",
+              "mode",
+              "distance_m",
+              "stops",
+              "updated_at",
+              "type"
+            ],
+            "additionalProperties": false
+          }
+        ],
+        "description": "A visit or a trip of the timeline"
+      },
+      "Location": {
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "at_place",
+              "moving",
+              "unknown"
+            ]
+          },
+          "since": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Since when: the arrival at the place, or the trip's start"
+          },
+          "place": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "home",
+                          "work",
+                          "school"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "category": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "name",
+                  "category"
+                ],
+                "additionalProperties": false,
+                "description": "A place by its label and name"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "At a place: which"
+          },
+          "trip": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "description": "The trip's id; it is listed by list_trips once it ends"
+                  },
+                  "mode": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "speed_mps": {
+                    "description": "Meters per second",
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "destination": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "label": {
+                            "anyOf": [
+                              {
+                                "type": "string",
+                                "enum": [
+                                  "home",
+                                  "work",
+                                  "school"
+                                ]
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "name": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "category": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "label",
+                          "name",
+                          "category"
+                        ],
+                        "additionalProperties": false,
+                        "description": "A place by its label and name"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "Where it is predicted to end"
+                  },
+                  "eta": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The predicted arrival"
+                  },
+                  "eta_earliest": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "eta_latest": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "format": "date-time"
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "mode",
+                  "speed_mps",
+                  "destination",
+                  "eta",
+                  "eta_earliest",
+                  "eta_latest"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Moving: the trip"
+          },
+          "area": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "label": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "home",
+                          "work",
+                          "school"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "name": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "category": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "label",
+                  "name",
+                  "category"
+                ],
+                "additionalProperties": false,
+                "description": "A place by its label and name"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The area the person is in, while moving or unknown: a park, a campus"
+          },
+          "coordinate": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "lat": {
+                    "type": "number",
+                    "minimum": -90,
+                    "maximum": 90
+                  },
+                  "lng": {
+                    "type": "number",
+                    "minimum": -180,
+                    "maximum": 180
+                  },
+                  "accuracy_m": {
+                    "type": "number",
+                    "minimum": 0
+                  },
+                  "at": {
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "lat",
+                  "lng",
+                  "accuracy_m",
+                  "at"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The last fix"
+          },
+          "permission": {
+            "type": "string",
+            "enum": [
+              "always",
+              "when_in_use",
+              "denied",
+              "not_determined"
+            ],
+            "description": "The phone's location access for Anywhere"
+          },
+          "time_zone": {
+            "description": "The phone's time zone (IANA)",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time",
+            "description": "When the phone last reported it"
+          }
+        },
+        "required": [
+          "state",
+          "since",
+          "place",
+          "trip",
+          "area",
+          "coordinate",
+          "permission",
+          "time_zone",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "description": "Where the person is now, as their phone last reported it"
+      },
+      "Me": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "description": "The person's name, as their profile has it",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "time_zone": {
+            "description": "Their phone's time zone (IANA), to show times in",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "agent": {
+            "type": "object",
+            "properties": {
+              "grant_id": {
+                "type": "string"
+              },
+              "agent": {
+                "type": "string",
+                "enum": [
+                  "muse",
+                  "grok",
+                  "chatgpt",
+                  "other"
+                ],
+                "description": "Muse, Grok and ChatGPT by name; any other agent is other"
+              },
+              "name": {
+                "type": "string",
+                "description": "The name the person gave this connection"
+              },
+              "connected_at": {
+                "type": "string",
+                "format": "date-time"
+              },
+              "last_used_at": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "format": "date-time"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "grant_id",
+              "agent",
+              "name",
+              "connected_at",
+              "last_used_at"
+            ],
+            "additionalProperties": false
+          },
+          "limits": {
+            "type": "object",
+            "properties": {
+              "calls_per_day": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "calls_per_minute": {
+                "type": "integer",
+                "minimum": 0
+              },
+              "map_changes_per_day": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "calls_per_day",
+              "calls_per_minute",
+              "map_changes_per_day"
+            ],
+            "additionalProperties": false
+          },
+          "usage": {
+            "type": "object",
+            "properties": {
+              "calls_today": {
+                "type": "integer",
+                "minimum": 0,
+                "description": "This connection's calls today (UTC), this one included"
+              },
+              "map_changes_today": {
+                "type": "integer",
+                "minimum": 0
+              }
+            },
+            "required": [
+              "calls_today",
+              "map_changes_today"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "name",
+          "time_zone",
+          "agent",
+          "limits",
+          "usage"
+        ],
+        "additionalProperties": false,
+        "description": "The person, and this connection"
+      },
+      "PlacePage": {
+        "type": "object",
+        "properties": {
+          "places": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Place"
+            }
+          },
+          "removed": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/RemovedPlace"
+            },
+            "description": "With `updated_since`: the ids that changed since then and are no longer found; empty otherwise"
+          },
+          "next_cursor": {
+            "description": "Pass it as `cursor` for the next page; null on the last page",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "places",
+          "removed",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "VisitPage": {
+        "type": "object",
+        "properties": {
+          "visits": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Visit"
+            }
+          },
+          "next_cursor": {
+            "description": "Pass it as `cursor` for the next page; null on the last page",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "visits",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "TripPage": {
+        "type": "object",
+        "properties": {
+          "trips": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Trip"
+            }
+          },
+          "next_cursor": {
+            "description": "Pass it as `cursor` for the next page; null on the last page",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "trips",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "HistoryPage": {
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/HistoryItem"
+            }
+          },
+          "next_cursor": {
+            "description": "Pass it as `cursor` for the next page; null on the last page",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "items",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "WriteResult": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "created",
+              "merged",
+              "updated",
+              "unchanged",
+              "removed"
+            ],
+            "description": "created: a new place. merged: the venue was on the map already; that place took the stronger status (favorite over wantToGo over none). updated, unchanged: what an edit did. removed: off the map"
+          },
+          "place": {
+            "description": "The place now; as it was, once removed",
+            "$ref": "#/components/schemas/Place"
+          },
+          "change_id": {
+            "description": "The change the person can undo in the app; null when nothing undoable changed",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "outcome",
+          "place",
+          "change_id"
+        ],
+        "additionalProperties": false,
+        "description": "What a change to the map did"
+      },
+      "Error": {
+        "type": "object",
+        "properties": {
+          "error": {
+            "type": "object",
+            "properties": {
+              "code": {
+                "type": "string",
+                "description": "Stable, snake_case: invalid_token, invalid_request, place_not_found, quota_exceeded…"
+              },
+              "message": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "code",
+              "message"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "error"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "responses": {
+      "BadRequest": {
+        "description": "The request does not match this document: the message says how (invalid_request, invalid_cursor, invalid_json)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unauthorized": {
+        "description": "No valid token: missing, malformed, unknown or revoked (invalid_token)",
+        "headers": {
+          "WWW-Authenticate": {
+            "schema": {
+              "type": "string"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "NotFound": {
+        "description": "No such place on the map (place_not_found), path (not_found) or location (location_not_shared)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Conflict": {
+        "description": "The change cannot be made: a visited place takes only a label (not_saved), a label needs visits (not_visited), an Idempotency-Key reused for another request (idempotency_conflict)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "PayloadTooLarge": {
+        "description": "The body is over 32 KiB (payload_too_large)",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "TooManyRequests": {
+        "description": "A limit is reached (quota_exceeded) or this address presented too many unknown tokens today (too_many_attempts); Retry-After says when to retry, when waiting helps",
+        "headers": {
+          "Retry-After": {
+            "description": "Seconds to wait",
+            "schema": {
+              "type": "integer"
+            }
+          }
+        },
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      },
+      "Unavailable": {
+        "description": "Switched off for now, or a dependency is down (agents_api_disabled, quota_unavailable, lookup_failed, activity_unavailable, idempotency_unavailable): retry later",
+        "content": {
+          "application/json": {
+            "schema": {
+              "$ref": "#/components/schemas/Error"
+            }
+          }
+        }
+      }
+    }
+  }
+}

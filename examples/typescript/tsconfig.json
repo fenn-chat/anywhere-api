@@ -1,0 +1,17 @@
+// Type-checks the examples: npx -p typescript -p @types/node tsc
+// Node runs them as they are (node get_me.ts), stripping their types.
+{
+  "compilerOptions": {
+    "target": "es2022",
+    "lib": ["es2022"],
+    "types": ["node"],
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "strict": true,
+    "noEmit": true,
+    "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true,
+    "erasableSyntaxOnly": true
+  },
+  "include": ["*.ts"]
+}

@@ -1,0 +1,10 @@
+{
+  "name": "anywhere-api-examples",
+  "private": true,
+  "description": "The Anywhere agent API's TypeScript examples: run one with node (22.18 or later), e.g. node get_me.ts",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.18"
+  }
+}

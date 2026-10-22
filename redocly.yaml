@@ -1,0 +1,4 @@
+# How .github/workflows/lint.yml lints openapi.json (redocly lint): Redocly's
+# recommended rules, every warning an error.
+extends:
+  - recommended-strict
