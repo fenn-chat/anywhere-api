@@ -20,18 +20,19 @@ its name ("Grok added 2 places to your map"). More in
    `Bearer anyw_pat_…`. Where Grok asks for a header, give exactly that
    name and value; where it asks for a bearer token or an API key, give the
    token alone.
-5. Save. Grok finds Anywhere's tools and uses them in your chats. Three of
-   them change your map (`add_place`, `update_place`, `remove_place`); you
-   can undo each change in Anywhere.
+5. Save. Grok finds Anywhere's tools and uses them in your chats. The place
+   and tag tools change your map; `open_map` sends a notification to your
+   phone. [The API guide](../README.md#tags-and-ratings) explains
+   which changes have Undo.
 
 On Grok Business and Enterprise, a team admin first allows the connector for
 the team.
 
 ## Try it
 
-> What are my favorite places in Paris?
+> Which places do I love in Paris?
 
-> Save Café de Flore to my want-to-go list, with the note "hot chocolate".
+> Save Café de Flore as a place I want to go, with the note "hot chocolate".
 
 > How much time did I spend at work this week?
 

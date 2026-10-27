@@ -77,13 +77,12 @@ export function placeName(place: { name: string | null; label: Label | null } | 
 
 // The answers, as openapi.json describes them.
 
-export type Status = "favorite" | "wantToGo";
 export type Label = "home" | "work" | "school";
 
 export interface Me {
   name: string | null;
   time_zone: string | null;
-  agent: { grant_id: string; agent: "muse" | "grok" | "chatgpt" | "other"; name: string; connected_at: string; last_used_at: string | null };
+  agent: { grant_id: string; agent: "chatgpt" | "claude" | "grok" | "other"; name: string; connected_at: string; last_used_at: string | null };
   limits: { calls_per_day: number; calls_per_minute: number; map_changes_per_day: number };
   usage: { calls_today: number; map_changes_today: number };
 }
@@ -97,7 +96,9 @@ export interface Place {
   address: string | null;
   category: string | null;
   provider_ids: string[];
-  status: Status | null;
+  /** The standard favorite and wantToGo first, then the person's own (list_tags names them). */
+  tags: string[];
+  rating: number | null;
   unconfirmed: boolean;
   label: Label | null;
   note: string | null;
@@ -127,6 +128,64 @@ export interface WriteResult {
   outcome: "created" | "merged" | "updated" | "unchanged" | "removed";
   place: Place;
   change_id: string | null;
+}
+
+export interface MapOpenResult {
+  outcome: "sent" | "unavailable";
+  camera: { lat: number; lng: number; distance_m: number; heading: number; pitch: number };
+  notifications_sent: number;
+}
+
+export interface Friend {
+  id: string;
+  name: string | null;
+  shares_location: boolean;
+  location: Location | null;
+}
+
+export interface FriendPage {
+  friends: Friend[];
+  next_cursor: string | null;
+}
+
+export interface CalendarEvent {
+  id: string;
+  provider: "apple" | "google";
+  title: string | null;
+  location: string | null;
+  notes: string | null;
+  start: string;
+  end: string;
+  all_day: boolean;
+  availability: "busy" | "free" | "tentative" | "unavailable";
+  calendar: { id: string; title: string | null; color: string | null };
+  link: string | null;
+  updated_at: string;
+}
+
+export interface CalendarPage {
+  events: CalendarEvent[];
+  next_cursor: string | null;
+}
+
+export interface PlaceTag {
+  id: string;
+  name: string;
+  /** favorite and wantToGo, which every person has: neither renamed nor removed, without a source or times. */
+  standard: boolean;
+  source: string | null;
+  created_at: string | null;
+  updated_at: string | null;
+}
+
+export interface TagPage {
+  tags: PlaceTag[];
+  next_cursor: string | null;
+}
+
+export interface TagWriteResult {
+  outcome: "created" | "updated" | "unchanged" | "removed";
+  tag: PlaceTag;
 }
 
 export interface PlaceRef {

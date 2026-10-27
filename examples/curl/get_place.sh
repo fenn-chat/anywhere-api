@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# GET /places/{place_id}: one place, with its status, label, note, origin and
+# GET /places/{place_id}: one place, with its tags, label, note, origin and
 # visit stats.
 # Usage: ./get_place.sh <place_id>   (ids come from list_places)
 set -euo pipefail

@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# POST /places: saves a venue to the person's want-to-go list, with a note.
+# POST /places: saves a venue tagged wantToGo (the person wants to go), with a note.
 # 201 for a new place, 200 when the venue was on the map already. The
 # Idempotency-Key makes a retry safe: retry with the same key, never a new one.
 set -euo pipefail
@@ -16,6 +16,6 @@ curl -sS --fail-with-body -w '\n' -X POST "$API/places" \
     "lng": 2.3326,
     "address": "172 Boulevard Saint-Germain, 75006 Paris, France",
     "category": "cafe",
-    "status": "wantToGo",
+    "tags": ["wantToGo"],
     "note": "Hot chocolate on the terrace"
   }'

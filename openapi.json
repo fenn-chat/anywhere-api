@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Anywhere agent API",
-    "version": "1.0.0",
-    "description": "Read and change a person's Anywhere map: the places they saved and the ones they go to, their visits and trips (all of their history), and where they are now.\n\n**Authentication.** Every call carries the person's personal token, made in the Anywhere app: `Authorization: Bearer anyw_pat_…`. The same token connects an MCP client to `https://anywhere.fenn.chat/mcp` (Streamable HTTP), whose tools are these operations under the same names.\n\n**The person is told.** Every call that reads or changes their places, history or location is recorded and shown to them in the app. Every change can be undone there.\n\n**Limits,** per token: 1000 calls a day (UTC) and 60 a minute, 200 changes to the map a day; 429 with Retry-After beyond them.\n\n**Conventions.** Times are ISO 8601 in UTC, to the millisecond; coordinates WGS84 degrees. Lists come in pages of up to 200 items: pass `next_cursor` as `cursor` for the next, with the same filters. GET answers carry an ETag (If-None-Match gives 304 while it holds); `updated_since` lists what changed since a time. Errors are `{ \"error\": { \"code\", \"message\" } }`. Adding a place takes an Idempotency-Key.",
+    "version": "2.1.0",
+    "description": "Read and change a person's Anywhere map: the places they saved and the ones they go to, their visits and trips (all of their history), and where they are now.\n\n**Authentication.** Every call carries the person's personal token, made in the Anywhere app: `Authorization: Bearer anyw_pat_…`. The same token connects an MCP client to `https://anywhere.fenn.chat/mcp` (Streamable HTTP), whose tools are these operations under the same names.\n\n**The person is told.** Reads of places, tags, history, location, shared friends' locations and calendar are recorded and shown in the app, as are edits. Saved-place edits, their tags included, can be undone; labels and changes to the tags themselves (created, renamed, removed) cannot. A map-view request sends its own immediate notification and saves no places.\n\n**Limits,** per token: 1000 calls a day (UTC) and 60 a minute, 200 changes to the map a day; 429 with Retry-After beyond them.\n\n**Conventions.** Times are ISO 8601 in UTC, to the millisecond; coordinates WGS84 degrees. Lists come in pages of up to 200 items: pass `next_cursor` as `cursor` for the next, with the same filters. GET answers carry an ETag (If-None-Match gives 304 while it holds); `updated_since` lists what changed since a time. Errors are `{ \"error\": { \"code\", \"message\" } }`. Adding a place takes an Idempotency-Key.",
     "contact": {
       "name": "Anywhere agent API",
       "url": "https://github.com/fenn-chat/anywhere-api"
@@ -43,6 +43,22 @@
     {
       "name": "Location",
       "description": "Where the person is now"
+    },
+    {
+      "name": "Map",
+      "description": "Send a notification opening a camera view on the person's phone"
+    },
+    {
+      "name": "Friends",
+      "description": "The locations people already share with the person"
+    },
+    {
+      "name": "Calendar",
+      "description": "The person's calendar events mirrored into Anywhere"
+    },
+    {
+      "name": "Tags",
+      "description": "The tags of the person's places: the standard favorite and wantToGo, and their own"
     }
   ],
   "paths": {
@@ -98,18 +114,27 @@
           "Places"
         ],
         "summary": "Search the person's places",
-        "description": "The places on the person's map: saved ones (in a list, favorite or wantToGo, or none) and ones they go to without saving them (home, work…). Latest change first, or nearest first with `near`. Each has its label, private note, origin and visit stats. Filters combine; follow `next_cursor` for more.",
+        "description": "The places on the person's map: saved ones (tagged favorite, wantToGo, the person's own tags, or none) and ones they go to without saving them (home, work…). Latest change first, or nearest first with `near`. Each has its tags, label, note, origin and visit stats. Follow `next_cursor` for more.",
         "parameters": [
+          {
+            "name": "tag",
+            "in": "query",
+            "required": false,
+            "description": "Only the places with this tag: favorite, wantToGo, or one of the person's own from list_tags",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
           {
             "name": "status",
             "in": "query",
             "required": false,
-            "description": "Only these: favorite or wantToGo (the person's lists), saved (saved without a list), unconfirmed (the yellow ?: venue to confirm)",
+            "description": "Only these: saved (saved without a tag), unconfirmed (the yellow ?: venue to confirm)",
             "schema": {
               "type": "string",
               "enum": [
-                "favorite",
-                "wantToGo",
                 "saved",
                 "unconfirmed"
               ]
@@ -241,7 +266,7 @@
           "Places"
         ],
         "summary": "Save a place",
-        "description": "Saves a venue on the person's map, in a list (favorite, wantToGo) or none, with a note. A venue already on the map (the same provider id, or the same name within 100 m) is never added twice: that place takes the stronger status and the note. The person is told, and can undo it in the app.",
+        "description": "Saves a venue on the person's map, with tags (favorite, wantToGo, the person's own) and a note. A venue already on the map (same provider id, or same name within 100 m) is never added twice: that place adds the request's tags to its own, and takes the note. The person is told, and can undo it.",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -342,20 +367,16 @@
                       "description": "apple:<Apple Maps id> or google:<Google place id>"
                     }
                   },
-                  "status": {
-                    "description": "favorite or wantToGo; saved without a list when left out",
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "enum": [
-                          "favorite",
-                          "wantToGo"
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
+                  "tags": {
+                    "description": "The tags it takes: favorite, wantToGo, or the person's own from list_tags; saved without a tag when left out",
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "description": "A tag's id: favorite, wantToGo, or one from list_tags"
+                    }
                   },
                   "note": {
                     "description": "The person's note on the place, up to 4000 characters",
@@ -392,7 +413,7 @@
             }
           },
           "201": {
-            "description": "Created: a new place (Location names it)",
+            "description": "Created (Location names it)",
             "headers": {
               "Location": {
                 "schema": {
@@ -413,6 +434,9 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "409": {
             "$ref": "#/components/responses/Conflict"
@@ -436,7 +460,7 @@
           "Places"
         ],
         "summary": "Read a place",
-        "description": "One place of the person's map, by its id: its status, label, private note, origin and visit stats.",
+        "description": "One place of the person's map, by its id: its tags, label, private note, origin and visit stats.",
         "parameters": [
           {
             "name": "place_id",
@@ -495,7 +519,7 @@
           "Places"
         ],
         "summary": "Change a place",
-        "description": "Changes what is given of a place: a saved place's status, note or name; the label (home, work, school) of a place the person has been to. The person is told, and can undo a status, note or name in the app.",
+        "description": "Changes a saved place's tags, note, name or rating; or the label (home, work, school) of a visited place. Adding favorite is how a place is loved. The person is told and can undo saved-place edits in the app. Tag edits keep the place's other tags.",
         "parameters": [
           {
             "name": "place_id",
@@ -516,21 +540,6 @@
               "schema": {
                 "type": "object",
                 "properties": {
-                  "status": {
-                    "description": "favorite, wantToGo, or null for no list",
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "enum": [
-                          "favorite",
-                          "wantToGo"
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
                   "note": {
                     "description": "The person's note; null or blank clears it",
                     "anyOf": [
@@ -548,6 +557,41 @@
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
+                  },
+                  "rating": {
+                    "description": "The person's rating, 1 to 5 stars; null removes it",
+                    "anyOf": [
+                      {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 5
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "add_tags": {
+                    "description": "Tags the place takes, keeping its others: favorite (the person loves it), wantToGo, or the person's own from list_tags",
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "description": "A tag's id: favorite, wantToGo, or one from list_tags"
+                    }
+                  },
+                  "remove_tags": {
+                    "description": "Tags the place loses, keeping its others",
+                    "maxItems": 50,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200,
+                      "description": "A tag's id: favorite, wantToGo, or one from list_tags"
+                    }
                   },
                   "label": {
                     "description": "home, work or school, or null for none of them: only a place the person has been to takes one. A place on the map for its label alone (too short a stay for a pin) leaves it without one: outcome removed",
@@ -1174,6 +1218,599 @@
           }
         }
       }
+    },
+    "/map/open": {
+      "post": {
+        "operationId": "open_map",
+        "tags": [
+          "Map"
+        ],
+        "summary": "Show a map on the person's phone",
+        "description": "Sends a notification that opens Anywhere at the requested camera, or on a place of the person's map with its panel (place_id), when tapped. Saves no places and never launches the app remotely. sent means FCM accepted a push, not that it was seen. Retry with an idempotency key.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "A key of your own for this request (a UUID): a retry with the same key and the same input answers the first response again, without a second change",
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7E]{1,255}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "camera": {
+                    "description": "Where the map looks; with place_id, the place from 1 km overhead by default",
+                    "type": "object",
+                    "properties": {
+                      "lat": {
+                        "type": "number",
+                        "minimum": -90,
+                        "maximum": 90,
+                        "description": "Camera center latitude, WGS84 degrees"
+                      },
+                      "lng": {
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180,
+                        "description": "Camera center longitude, WGS84 degrees"
+                      },
+                      "distance_m": {
+                        "type": "number",
+                        "minimum": 100,
+                        "maximum": 30000000,
+                        "description": "Camera distance from the center in meters: smaller is closer, larger shows more of the map"
+                      },
+                      "heading": {
+                        "default": 0,
+                        "description": "Degrees clockwise from north; 0 faces north",
+                        "type": "number",
+                        "minimum": 0,
+                        "exclusiveMaximum": 360
+                      },
+                      "pitch": {
+                        "default": 0,
+                        "description": "Degrees tilted from looking straight down; 0 is overhead",
+                        "type": "number",
+                        "minimum": 0,
+                        "maximum": 80
+                      }
+                    },
+                    "required": [
+                      "lat",
+                      "lng",
+                      "distance_m"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "place_id": {
+                    "description": "A place on the person's map, from list_places: the tap opens its panel on the map, as when the person taps its pin. Give camera, place_id or both",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "title": {
+                    "description": "Notification title; the connected agent's name by default",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  },
+                  "message": {
+                    "description": "What this map view shows; defaults to Open this view in Anywhere, or Open <place> in Anywhere",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 500
+                  }
+                },
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MapOpenResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/friends": {
+      "get": {
+        "operationId": "list_friends",
+        "tags": [
+          "Friends"
+        ],
+        "summary": "Read the locations shared with the person",
+        "description": "Lists the people who currently share their location with this person, by account id, with that location. A location is null when not available. Never reads anyone's private location or history. Follow next_cursor for more.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Items per page, at most 200",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `next_cursor` of the previous page, with the same filters",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/FriendPage"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/calendar/events": {
+      "get": {
+        "operationId": "list_calendar_events",
+        "tags": [
+          "Calendar"
+        ],
+        "summary": "Read the person's calendar",
+        "description": "Lists calendar events mirrored into Anywhere from Apple and Google, earliest first, optionally overlapping a time range. This is the synced window (30 days past, 90 days ahead), not the provider's full calendar. Follow next_cursor for more.",
+        "parameters": [
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "Events ongoing after this time",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "string",
+                  "format": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "Events starting before this time",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "string",
+                  "format": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Items per page, at most 200",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `next_cursor` of the previous page, with the same filters",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/CalendarPage"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/tags": {
+      "get": {
+        "operationId": "list_tags",
+        "tags": [
+          "Tags"
+        ],
+        "summary": "Read the person's tags",
+        "description": "Lists the tags places have: the two standard ones first (favorite, shown as Love, and wantToGo), then the person's own by id. Use tag on list_places to read a tag's places. Follow next_cursor for more.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Items per page, at most 200",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `next_cursor` of the previous page, with the same filters",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagPage"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "post": {
+        "operationId": "create_tag",
+        "tags": [
+          "Tags"
+        ],
+        "summary": "Create a tag",
+        "description": "Creates a tag of the person's own for places. Use update_place's add_tags to tag saved places with it. Tag creation has no Undo; the person is told.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "A key of your own for this request (a UUID): a retry with the same key and the same input answers the first response again, without a second change",
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7E]{1,255}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagWriteResult"
+                }
+              }
+            }
+          },
+          "201": {
+            "description": "Created (Location names it)",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagWriteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/tags/{tag_id}": {
+      "patch": {
+        "operationId": "update_tag",
+        "tags": [
+          "Tags"
+        ],
+        "summary": "Rename a tag",
+        "description": "Renames one of the person's own tags, keeping its places and original import source. The standard tags are not renamed. No Undo; the person is told.",
+        "parameters": [
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "description": "A tag's id: favorite, wantToGo, or one from list_tags",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 100
+                  }
+                },
+                "required": [
+                  "name"
+                ],
+                "minProperties": 1,
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagWriteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "remove_tag",
+        "tags": [
+          "Tags"
+        ],
+        "summary": "Remove a tag",
+        "description": "Removes one of the person's own tags. Its places stay on the map, without this tag. The standard tags are not removed. No Undo; the person is told.",
+        "parameters": [
+          {
+            "name": "tag_id",
+            "in": "path",
+            "required": true,
+            "description": "A tag's id: favorite, wantToGo, or one from list_tags",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/TagWriteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
     }
   },
   "components": {
@@ -1237,20 +1874,12 @@
             },
             "description": "The venue's ids at Apple Maps (apple:<id>) and Google (google:<place id>)"
           },
-          "status": {
-            "anyOf": [
-              {
-                "type": "string",
-                "enum": [
-                  "favorite",
-                  "wantToGo"
-                ]
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "description": "The person's list: favorite, wantToGo, or null for saved without a list (always null for a visited place)"
+          "tags": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            },
+            "description": "Its tags' ids: the standard favorite (the person loves it) and wantToGo (they want to go), first, then the person's own tags (list_tags names them). Empty for a place saved without a tag, and always for a visited place"
           },
           "unconfirmed": {
             "type": "boolean",
@@ -1278,6 +1907,19 @@
               "string",
               "null"
             ]
+          },
+          "rating": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 5
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "The person's own stars, or null when unrated"
           },
           "origin": {
             "type": "object",
@@ -1376,10 +2018,11 @@
           "address",
           "category",
           "provider_ids",
-          "status",
+          "tags",
           "unconfirmed",
           "label",
           "note",
+          "rating",
           "origin",
           "visit_count",
           "total_time_s",
@@ -2152,12 +2795,12 @@
               "agent": {
                 "type": "string",
                 "enum": [
-                  "muse",
-                  "grok",
                   "chatgpt",
+                  "claude",
+                  "grok",
                   "other"
                 ],
-                "description": "Muse, Grok and ChatGPT by name; any other agent is other"
+                "description": "ChatGPT, Claude and Grok by name; any other agent is other"
               },
               "name": {
                 "type": "string",
@@ -2341,6 +2984,373 @@
         ],
         "additionalProperties": false
       },
+      "MapCamera": {
+        "type": "object",
+        "properties": {
+          "lat": {
+            "type": "number",
+            "minimum": -90,
+            "maximum": 90,
+            "description": "Camera center latitude, WGS84 degrees"
+          },
+          "lng": {
+            "type": "number",
+            "minimum": -180,
+            "maximum": 180,
+            "description": "Camera center longitude, WGS84 degrees"
+          },
+          "distance_m": {
+            "type": "number",
+            "minimum": 100,
+            "maximum": 30000000,
+            "description": "Camera distance from the center in meters: smaller is closer, larger shows more of the map"
+          },
+          "heading": {
+            "default": 0,
+            "description": "Degrees clockwise from north; 0 faces north",
+            "type": "number",
+            "minimum": 0,
+            "exclusiveMaximum": 360
+          },
+          "pitch": {
+            "default": 0,
+            "description": "Degrees tilted from looking straight down; 0 is overhead",
+            "type": "number",
+            "minimum": 0,
+            "maximum": 80
+          }
+        },
+        "required": [
+          "lat",
+          "lng",
+          "distance_m",
+          "heading",
+          "pitch"
+        ],
+        "additionalProperties": false
+      },
+      "MapOpenResult": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "sent",
+              "unavailable"
+            ],
+            "description": "sent: at least one push accepted by FCM; unavailable: no usable registered installation or delivery attempts exhausted. Neither confirms the person saw or opened it"
+          },
+          "camera": {
+            "$ref": "#/components/schemas/MapCamera"
+          },
+          "place_id": {
+            "description": "The place whose panel the notification opens, when one was asked for",
+            "type": "string"
+          },
+          "notifications_sent": {
+            "type": "integer",
+            "minimum": 0,
+            "description": "Installations for which FCM accepted this notification"
+          }
+        },
+        "required": [
+          "outcome",
+          "camera",
+          "notifications_sent"
+        ],
+        "additionalProperties": false
+      },
+      "Friend": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The account id of someone who shares their location with the person"
+          },
+          "name": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "shares_location": {
+            "type": "boolean",
+            "description": "Whether they currently share their location with the person: always true in this list"
+          },
+          "location": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/Location"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Only the location already shared with the person; null when not shared or not available"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "shares_location",
+          "location"
+        ],
+        "additionalProperties": false
+      },
+      "FriendPage": {
+        "type": "object",
+        "properties": {
+          "friends": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Friend"
+            }
+          },
+          "next_cursor": {
+            "description": "Pass it as `cursor` for the next page; null on the last page",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "friends",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarEvent": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "provider": {
+            "type": "string",
+            "enum": [
+              "apple",
+              "google"
+            ]
+          },
+          "title": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "location": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "notes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "start": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "end": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "all_day": {
+            "type": "boolean"
+          },
+          "availability": {
+            "type": "string",
+            "enum": [
+              "busy",
+              "free",
+              "tentative",
+              "unavailable"
+            ]
+          },
+          "calendar": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "color": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "color"
+            ],
+            "additionalProperties": false
+          },
+          "link": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        },
+        "required": [
+          "id",
+          "provider",
+          "title",
+          "location",
+          "notes",
+          "start",
+          "end",
+          "all_day",
+          "availability",
+          "calendar",
+          "link",
+          "updated_at"
+        ],
+        "additionalProperties": false
+      },
+      "CalendarPage": {
+        "type": "object",
+        "properties": {
+          "events": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/CalendarEvent"
+            }
+          },
+          "next_cursor": {
+            "description": "Pass it as `cursor` for the next page; null on the last page",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "events",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "Tag": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "description": "The tag's id, as a place's `tags` names it"
+          },
+          "name": {
+            "type": "string",
+            "description": "Its name: Love and Want to go for the standard tags"
+          },
+          "standard": {
+            "type": "boolean",
+            "description": "Whether it is one of the two standard tags every person has, favorite and wantToGo, which are neither renamed nor removed"
+          },
+          "source": {
+            "description": "The Google Maps list it was imported from; null for a tag created in Anywhere, and for a standard tag",
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "created_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null for a standard tag"
+          },
+          "updated_at": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null for a standard tag"
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "standard",
+          "source",
+          "created_at",
+          "updated_at"
+        ],
+        "additionalProperties": false,
+        "description": "A tag places have: a standard one, or one of the person's own (private: friends never see it)"
+      },
+      "TagPage": {
+        "type": "object",
+        "properties": {
+          "tags": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Tag"
+            }
+          },
+          "next_cursor": {
+            "description": "Pass it as `cursor` for the next page; null on the last page",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "tags",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "TagWriteResult": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated",
+              "unchanged",
+              "removed"
+            ]
+          },
+          "tag": {
+            "description": "The tag now; as it was when removed. Tag changes have no Undo",
+            "$ref": "#/components/schemas/Tag"
+          }
+        },
+        "required": [
+          "outcome",
+          "tag"
+        ],
+        "additionalProperties": false
+      },
       "WriteResult": {
         "type": "object",
         "properties": {
@@ -2353,7 +3363,7 @@
               "unchanged",
               "removed"
             ],
-            "description": "created: a new place. merged: the venue was on the map already; that place took the stronger status (favorite over wantToGo over none). updated, unchanged: what an edit did. removed: off the map"
+            "description": "created: a new place. merged: the venue was on the map already; that place has its tags and the request's together. updated, unchanged: what an edit did. removed: off the map"
           },
           "place": {
             "description": "The place now; as it was, once removed",
@@ -2431,7 +3441,7 @@
         }
       },
       "NotFound": {
-        "description": "No such place on the map (place_not_found), path (not_found) or location (location_not_shared)",
+        "description": "No such place on the map (place_not_found), tag (tag_not_found), path (not_found) or location (location_not_shared)",
         "content": {
           "application/json": {
             "schema": {
@@ -2441,7 +3451,7 @@
         }
       },
       "Conflict": {
-        "description": "The change cannot be made: a visited place takes only a label (not_saved), a label needs visits (not_visited), an Idempotency-Key reused for another request (idempotency_conflict)",
+        "description": "The change cannot be made: a visited place takes only a label (not_saved), a label needs visits (not_visited), too many tags (too_many_tags), a deleted tag (tag_deleted), a standard tag renamed or removed (standard_tag), or an Idempotency-Key reused for another request (idempotency_conflict)",
         "content": {
           "application/json": {
             "schema": {
@@ -2479,7 +3489,7 @@
         }
       },
       "Unavailable": {
-        "description": "Switched off for now, or a dependency is down (agents_api_disabled, quota_unavailable, lookup_failed, activity_unavailable, idempotency_unavailable): retry later",
+        "description": "Switched off for now, a dependency is down, or notification delivery is pending (agents_api_disabled, quota_unavailable, lookup_failed, activity_unavailable, idempotency_unavailable, notification_unavailable): retry later",
         "content": {
           "application/json": {
             "schema": {

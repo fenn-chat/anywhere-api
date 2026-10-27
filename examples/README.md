@@ -26,6 +26,17 @@ and history take an optional range: `./curl/list_visits.sh 2026-10-01 2026-10-08
 `add_place`, `update_place` and `remove_place` change the map for real: the
 person is told, and can undo each change in the app.
 
+The tag examples `create_tag`, `update_tag` and `remove_tag` change the
+person's own tags for real. The last two take the tag id returned by
+`create_tag` or `list_tags` (the standard tags `favorite` and `wantToGo` are
+neither renamed nor removed). Tag changes have no Undo action; deleting a
+tag keeps its places.
+
+`open_map` sends a notification for real, opening the requested camera view
+when the person taps it. It does not save places. `sent` means the push
+service accepted at least one notification; `unavailable` means no usable
+push target was found. Neither confirms that the app opened.
+
 The Python and TypeScript examples share a small client,
 [`python/anywhere.py`](python/anywhere.py) and
 [`typescript/anywhere.ts`](typescript/anywhere.ts): the token's header,

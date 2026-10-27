@@ -10,23 +10,30 @@ personal token as the REST API.
 | Authentication | The header `Authorization: Bearer anyw_pat_…` ([get a token](../README.md#getting-a-token)) |
 | OAuth | Not yet: clients that only connect with OAuth wait for it |
 
-Guides for the agents the app names: [Meta Muse](meta-muse.md) ·
-[Grok](grok.md) · [ChatGPT](chatgpt.md). Any other client: below.
+Guides for the agents the app names: [ChatGPT](chatgpt.md) ·
+[Grok](grok.md). Claude and any other client: below.
 
 ## Tools
 
 | Tool | What it does | Hints |
 |---|---|---|
 | `get_me` | Who the person is (name, time zone), this token's limits and usage | read-only |
-| `list_places` | Searches the person's places: by status, words, box, distance, change time | read-only |
-| `get_place` | One place: status, label, note, origin, visit stats | read-only |
-| `add_place` | Saves a venue, in a list or none, with a note | changes the map |
-| `update_place` | Changes a place's status, note, name or label | changes the map, destructive |
+| `list_places` | Searches the person's places: by tag, words, box, distance, change time | read-only |
+| `get_place` | One place: tags, label, note, origin, visit stats | read-only |
+| `add_place` | Saves a venue, with tags or none, and a note | changes the map |
+| `update_place` | Changes a place's tags, note, name, label or rating | changes the map, destructive |
 | `remove_place` | Takes a saved place off the map | changes the map, destructive |
 | `list_visits` | Visits: in a range, to a place, or in a box | read-only |
 | `list_trips` | Trips: when, from where to where, how, how far | read-only |
 | `get_history` | Visits and trips as one timeline | read-only |
 | `get_current_location` | Where the person is now | read-only |
+| `open_map` | Sends a notification that opens a specified camera view, or a place with its panel (`place_id`), in Anywhere | sends a notification |
+| `list_friends` | Friends and the current locations they share with the person | read-only |
+| `list_calendar_events` | The person's mirrored calendar events, by time range | read-only |
+| `list_tags` | The tags: the standard favorite and wantToGo, then the person's own | read-only |
+| `create_tag` | Creates a tag of the person's own | changes the map |
+| `update_tag` | Renames a tag of the person's own | changes the map, destructive |
+| `remove_tag` | Deletes a tag of the person's own while keeping its places | changes the map, destructive |
 
 Each tool is the REST operation of the same name in
 [`openapi.json`](../openapi.json): the same inputs (a place's id is the
@@ -34,8 +41,14 @@ argument `place_id`, the `Idempotency-Key` header the argument
 `idempotency_key`), answers, limits and errors. A call that fails is a tool
 result marked `isError`, whose text is the API's error,
 `{ "error": { "code", "message" } }`. The person is told of every call that
-reads or changes their places, history or location, and can undo every
-change in the app: change the map only when they ask.
+reads or changes their data, and can undo saved-place changes in the app.
+Tag (created, renamed, deleted) and label changes have no Undo action. Change the map within
+their request, including a standing
+request to keep their important places current. See
+[the agent setup and maintenance workflow](../README.md#set-up-your-agent)
+for seeding home, work and other known places, and
+[showing results on the phone](../README.md#show-map-results-on-your-phone)
+for what the current API can display.
 
 ## Check the connection
 

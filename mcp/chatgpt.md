@@ -25,7 +25,7 @@ Creating a GPT takes a plan that allows it.
 2. Name it ("Anywhere"), and give it instructions, for example:
 
    > You read and change my Anywhere map through the Anywhere action: my
-   > saved places (lists favorite and wantToGo), the places I go to, my
+   > saved places (tagged favorite, wantToGo or my own tags), the places I go to, my
    > visits and trips, and where I am now. Times are UTC: show them in my
    > time zone (get_me). Change my map only when I ask.
 

@@ -1,4 +1,4 @@
-// POST /places: saves a venue to the person's want-to-go list, with a note.
+// POST /places: saves a venue tagged wantToGo (the person wants to go), with a note.
 // The outcome is created for a new place, merged when the venue was on the map
 // already. The Idempotency-Key makes a retry safe: retry with the same key,
 // never a new one.
@@ -11,9 +11,9 @@ const result = await call<WriteResult>("POST", "/places", {
     lng: 2.3326,
     address: "172 Boulevard Saint-Germain, 75006 Paris, France",
     category: "cafe",
-    status: "wantToGo",
+    tags: ["wantToGo"],
     note: "Hot chocolate on the terrace",
   },
   headers: { "Idempotency-Key": crypto.randomUUID() },
 });
-console.log(`${result.outcome}: ${result.place.name}, ${result.place.status} (id ${result.place.id})`);
+console.log(`${result.outcome}: ${result.place.name}, tagged ${result.place.tags.join(", ") || "nothing"} (id ${result.place.id})`);
