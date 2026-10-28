@@ -17,6 +17,11 @@ REST and MCP are one API: each MCP tool is a REST operation under the same
 name, with the same inputs, answers, limits and errors. One token works for
 both.
 
+For ChatGPT and Dot, the app's copied prompt also includes a one-time
+connection link that establishes a persistent OAuth connection. See
+[Connect ChatGPT and Dot](mcp/chatgpt.md#connect-from-the-copied-prompt).
+Other assistants retain the same personal-token/API workflow.
+
 - [What an agent can do](#what-an-agent-can-do)
 - [Quick start](#quick-start)
 - [Set up your agent](#set-up-your-agent)

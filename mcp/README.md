@@ -1,14 +1,15 @@
 # Connecting an MCP client
 
-Anywhere's MCP server gives any MCP client the person's map, with the same
-personal token as the REST API.
+Anywhere's MCP server gives authenticated clients the person's map. The
+existing personal token works with both MCP and REST. ChatGPT and Dot can
+also use a persistent OAuth connection started from the app's copied prompt.
 
 | | |
 |---|---|
 | URL | `https://anywhere.fenn.chat/mcp` |
 | Transport | Streamable HTTP: stateless, answers in JSON, `POST` only (no event stream to open, no session) |
 | Authentication | The header `Authorization: Bearer anyw_pat_…` ([get a token](../README.md#getting-a-token)) |
-| OAuth | Not yet: clients that only connect with OAuth wait for it |
+| OAuth | [ChatGPT and Dot](chatgpt.md#connect-from-the-copied-prompt), using a separate one-time connection link |
 
 Guides for the agents the app names: [ChatGPT](chatgpt.md) ·
 [Grok](grok.md). Claude and any other client: below.
@@ -83,8 +84,8 @@ claude mcp add --transport http --scope user anywhere https://anywhere.fenn.chat
 
 ## Claude Desktop
 
-Claude's connectors (claude.ai, the desktop and mobile apps) connect with
-OAuth, which Anywhere does not offer yet. Claude Desktop reaches Anywhere
+The native OAuth connection currently targets ChatGPT and Dot. Other clients
+can keep using the personal-token workflow. Claude Desktop reaches Anywhere
 through [mcp-remote](https://www.npmjs.com/package/mcp-remote), a local
 bridge: in Settings, Developer, Edit Config, add to
 `claude_desktop_config.json`, then restart Claude.
