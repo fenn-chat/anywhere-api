@@ -1,14 +1,15 @@
 # Connecting an MCP client
 
 Anywhere's MCP server gives any MCP client the person's map, with the same
-personal token as the REST API.
+permissions as the REST API. The ChatGPT/Dot plugin uses OAuth; other
+clients can use a personal token.
 
 | | |
 |---|---|
 | URL | `https://anywhere.fenn.chat/mcp` |
 | Transport | Streamable HTTP: stateless, answers in JSON, `POST` only (no event stream to open, no session) |
 | Authentication | The header `Authorization: Bearer anyw_pat_…` ([get a token](../README.md#getting-a-token)) |
-| OAuth | Not yet: clients that only connect with OAuth wait for it |
+| OAuth | Authorization code with PKCE for the registered ChatGPT/Dot client; [connection guide](chatgpt.md) |
 
 Guides for the agents the app names: [ChatGPT](chatgpt.md) ·
 [Grok](grok.md). Claude and any other client: below.
@@ -18,9 +19,10 @@ Guides for the agents the app names: [ChatGPT](chatgpt.md) ·
 | Tool | What it does | Hints |
 |---|---|---|
 | `get_me` | Who the person is (name, time zone), this token's limits and usage | read-only |
+| `search_places` | Resolves a venue or street address with Apple Maps; returns candidates to save | read-only, public search |
 | `list_places` | Searches the person's places: by tag, words, box, distance, change time | read-only |
 | `get_place` | One place: tags, label, note, origin, visit stats | read-only |
-| `add_place` | Saves a venue, with tags or none, and a note | changes the map |
+| `add_place` | Saves a venue, with tags or none, and a note; a duplicate can replace its note | changes the map, destructive |
 | `update_place` | Changes a place's tags, note, name, label or rating | changes the map, destructive |
 | `remove_place` | Takes a saved place off the map | changes the map, destructive |
 | `list_visits` | Visits: in a range, to a place, or in a box | read-only |
@@ -84,7 +86,8 @@ claude mcp add --transport http --scope user anywhere https://anywhere.fenn.chat
 ## Claude Desktop
 
 Claude's connectors (claude.ai, the desktop and mobile apps) connect with
-OAuth, which Anywhere does not offer yet. Claude Desktop reaches Anywhere
+OAuth. Anywhere currently registers only the ChatGPT/Dot OAuth client;
+other clients use a personal token. Claude Desktop reaches Anywhere
 through [mcp-remote](https://www.npmjs.com/package/mcp-remote), a local
 bridge: in Settings, Developer, Edit Config, add to
 `claude_desktop_config.json`, then restart Claude.

@@ -1,14 +1,37 @@
-# ChatGPT
+# ChatGPT and Dot
 
-ChatGPT's own MCP apps (developer mode) connect with OAuth or with no
-authentication at all; Anywhere wants your token on every call and offers no
-OAuth yet, so this guide gets their steps once it does. Until then, ChatGPT
-reaches your map with your personal token in two ways:
+Use the Anywhere plugin to connect your account once and let ChatGPT or
+Dot read and update your map. The plugin is being submitted for review;
+[the connection page](https://anywhere.fenn.chat/connect) has its current
+availability and setup instructions. A pasted prompt alone cannot install
+or authorize a plugin that is not available to your account.
 
-- **A GPT with an action**, in ChatGPT on the web, desktop and phone: the GPT
-  calls Anywhere's REST API, which its OpenAPI document describes.
-- **Codex** (its CLI, its IDE extension, and the ChatGPT desktop app) as an
-  MCP client.
+## Anywhere plugin
+
+1. Find **Anywhere** by Fenn in your plugin directory when it becomes available.
+2. Connect it. Review the permissions and approve in the Anywhere iPhone app.
+   On a computer or an older app, the authorization page also accepts a personal
+   token in a secure form. Enter it there, never into a chat or URL.
+3. Return to ChatGPT or Dot. `get_me` verifies access before the agent says
+   the map is connected. The import request can then continue.
+4. The agent reads existing places, resolves known venues and addresses with
+   `search_places`, saves confirmed locations, and reports what succeeded.
+   It asks about ambiguous places instead of guessing. It can only use memories
+   and conversations its host actually makes available.
+
+The copied onboarding prompt contains the import request and connection link,
+not a credential. A connection can read and edit your map, read your history,
+current location, friends' locations shared with you and synced calendar,
+and send map notifications. OAuth uses short-lived access tokens and rotating
+refresh tokens. You can revoke the connection in Anywhere's **Agents**.
+
+Developers testing the unpublished package use `plugins/anywhere` in the
+Anywhere source repository and the developer plugin upload flow. Its MCP URL
+is `https://anywhere.fenn.chat/mcp`; the registered public OAuth client is
+`chatgpt`, using PKCE and the stable ChatGPT callback. Other OAuth client IDs
+and redirect URLs are not accepted.
+
+The alternatives below remain available for personal-token clients.
 
 ## A token for ChatGPT
 

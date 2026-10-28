@@ -11,11 +11,11 @@ your places, on your phone.
 | REST | `https://anywhere.fenn.chat/api/v1` |
 | MCP | `https://anywhere.fenn.chat/mcp` (Streamable HTTP) |
 | Contract | [`openapi.json`](openapi.json) (OpenAPI 3.1), also served at `https://anywhere.fenn.chat/api/v1/openapi.json` |
-| Authentication | `Authorization: Bearer anyw_pat_…`, a personal token you make in the app |
+| Authentication | OAuth for the Anywhere ChatGPT/Dot plugin; `Authorization: Bearer anyw_pat_…` for personal-token clients |
 
 REST and MCP are one API: each MCP tool is a REST operation under the same
-name, with the same inputs, answers, limits and errors. One token works for
-both.
+name, with the same inputs, answers, limits and errors. Personal tokens work
+for both; OAuth access tokens are scoped to the MCP resource.
 
 - [What an agent can do](#what-an-agent-can-do)
 - [Quick start](#quick-start)
@@ -37,6 +37,7 @@ both.
 | What | REST | MCP tool | Examples |
 |---|---|---|---|
 | Who the person is, this token's limits and usage | `GET /me` | `get_me` | [curl](examples/curl/get_me.sh) · [Python](examples/python/get_me.py) · [TypeScript](examples/typescript/get_me.ts) |
+| Resolve a venue or street address through Apple Maps | `GET /search/places` | `search_places` | [curl](examples/curl/search_places.sh) · [Python](examples/python/search_places.py) · [TypeScript](examples/typescript/search_places.ts) |
 | Search the person's places | `GET /places` | `list_places` | [curl](examples/curl/list_places.sh) · [Python](examples/python/list_places.py) · [TypeScript](examples/typescript/list_places.ts) |
 | Save a place | `POST /places` | `add_place` | [curl](examples/curl/add_place.sh) · [Python](examples/python/add_place.py) · [TypeScript](examples/typescript/add_place.ts) |
 | Read a place | `GET /places/{place_id}` | `get_place` | [curl](examples/curl/get_place.sh) · [Python](examples/python/get_place.py) · [TypeScript](examples/typescript/get_place.ts) |
@@ -109,7 +110,9 @@ For an MCP client (ChatGPT, Claude, Grok, Cursor…), see [MCP](#mcp).
 
 ## Set up your agent
 
-Connect the agent with your personal token, then give it a standing request:
+For ChatGPT or Dot, use the [Anywhere plugin connection](mcp/chatgpt.md). Other
+clients can use a personal token in their credential store. Then give the
+agent a standing request:
 
 > Send all the important places you already know about me to Anywhere,
 > especially my home, work and school, plus my regular places, favorites and
@@ -123,12 +126,16 @@ Connect the agent with your personal token, then give it a standing request:
 > area, or opening one of my places. Tell me what you saved or changed and
 > how to view it.
 
-The app's **Copy prompt** includes the connection details and the personal
-token. Treat the entire copied prompt as a credential: share it only with
-the private agent conversation you intend to connect. Prefer the client's
-credential store when it offers one. Never publish the prompt or put it in
-a shared chat, repository or log. The documentation and examples use
-`anyw_pat_…` as a placeholder, not a working key.
+The app's main **Copy prompt** contains no credential. It asks ChatGPT or
+Dot to connect the Anywhere plugin and continue the import after approval.
+If the plugin is not available in the account's directory, follow
+[the connection page](https://anywhere.fenn.chat/connect); pasting text cannot
+install an unavailable plugin. Access to previous chats depends on what
+the host actually makes available to the agent.
+
+The separate **Personal token for another agent** action is for clients
+with a supported secret store or authenticated HTTP tools. Keep that token
+out of public or shared chats, repositories and logs.
 
 REST clients use `https://anywhere.fenn.chat/api/v1` and
 `Authorization: Bearer <your token>`. MCP clients use
@@ -144,8 +151,10 @@ An agent following that standing request should:
    `next_cursor` until it has the existing places it needs to compare.
 2. Save known places that are missing with `add_place` (`POST /places`).
    A name, `lat` and `lng` are required; include a known address and provider
-   ids when available. This API does not search or geocode an address:
-   resolve it reliably first, or ask the person. Never invent coordinates.
+   ids when available. Resolve a venue with `search_places` (`GET /search/places`),
+   supplying its city in `query`; use `kind: address` for a street address.
+   Confirm ambiguous candidates with the person. An empty answer is a miss;
+   `503 place_search_unavailable` means search is unavailable. Never invent coordinates.
    Leave `tags` unset unless the person identified a place they love
    (`favorite`), one they want to go to (`wantToGo`), or a tag of theirs. Use an `Idempotency-Key` for retries.
 3. Reuse existing place ids. Use `update_place` (`PATCH /places/{place_id}`)
@@ -287,15 +296,15 @@ A personal token is made in the Anywhere app, by the person whose map it
 opens:
 
 1. In Anywhere, tap your avatar, then **Agents**.
-2. Choose the agent you are connecting: **ChatGPT**, **Claude**, **Grok**,
-   or another agent, which you name ("OpenClaw on my Mac"). The app tells
-   you what each agent did by this name.
+2. Choose **Personal token for another agent** and name the connection
+   ("OpenClaw on my Mac"). Older app versions offer individual agent names.
+   The app tells you what each agent did by this name.
 3. Copy the token. It starts with `anyw_pat_` and is shown once: Anywhere
    keeps only a hash of it.
 
 A token opens the person's whole map: it reads and changes their places, and
 reads their history, current location, available friends' locations and
-mirrored calendar, and can send map-view notifications. There are no scopes yet.
+mirrored calendar, and can send map-view notifications. OAuth has one broad `anywhere` scope with these same permissions; fine-grained scopes are not available.
 Keep it out of code, logs, URLs and shared conversations; give it to the
 agent the way the agent keeps secrets (its connector's credential, a secret
 store, an environment variable), or use the app's private setup prompt as
