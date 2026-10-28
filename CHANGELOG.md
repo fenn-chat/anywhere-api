@@ -4,17 +4,6 @@ The agent API's changes, newest first. The version is `info.version` in
 [`openapi.json`](openapi.json); paths stay under `/v1` while every change is
 compatible.
 
-## 2.2.0
-
-- **OAuth connection** for the Anywhere ChatGPT/Dot plugin: authorization code
-  with PKCE, short-lived access tokens, rotating refresh tokens and revocation.
-  Personal tokens continue to work. The plugin's directory listing is subject
-  to review; current availability is on the connection page.
-- **Place resolution**: `search_places` (`GET /search/places`) finds venue or
-  street-address candidates through Apple Maps. Use `query`, optional `near`,
-  `kind` (`venue` or `address`) and `limit` (1–5). Search does not save anything;
-  pass a confirmed candidate to `add_place`. Provider outages return `503`.
-
 ## 2.1.0
 
 - **A place on the phone**: `open_map` (`POST /map/open`) takes `place_id`, a

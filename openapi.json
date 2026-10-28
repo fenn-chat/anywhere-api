@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Anywhere agent API",
-    "version": "2.2.0",
-    "description": "Read and change a person's Anywhere map: the places they saved and the ones they go to, their visits and trips (all of their history), and where they are now.\n\n**Authentication.** Every REST call carries a personal token made in the Anywhere app: `Authorization: Bearer anyw_pat_…`. MCP also supports OAuth access tokens scoped to its resource; a personal token connects an MCP client to `https://anywhere.fenn.chat/mcp` (Streamable HTTP), whose tools are these operations under the same names.\n\n**The person is told.** Reads of places, tags, history, location, shared friends' locations and calendar are recorded and shown in the app, as are edits. Saved-place edits, their tags included, can be undone; labels and changes to the tags themselves (created, renamed, removed) cannot. A map-view request sends its own immediate notification and saves no places.\n\n**Limits,** per token: 1000 calls a day (UTC) and 60 a minute, 200 changes to the map a day; 429 with Retry-After beyond them.\n\n**Conventions.** Times are ISO 8601 in UTC, to the millisecond; coordinates WGS84 degrees. Lists come in pages of up to 200 items: pass `next_cursor` as `cursor` for the next, with the same filters. GET answers carry an ETag (If-None-Match gives 304 while it holds); `updated_since` lists what changed since a time. Errors are `{ \"error\": { \"code\", \"message\" } }`. Adding a place takes an Idempotency-Key.",
+    "version": "2.1.0",
+    "description": "Read and change a person's Anywhere map: the places they saved and the ones they go to, their visits and trips (all of their history), and where they are now.\n\n**Authentication.** Every call carries the person's personal token, made in the Anywhere app: `Authorization: Bearer anyw_pat_…`. The same token connects an MCP client to `https://anywhere.fenn.chat/mcp` (Streamable HTTP), whose tools are these operations under the same names.\n\n**The person is told.** Reads of places, tags, history, location, shared friends' locations and calendar are recorded and shown in the app, as are edits. Saved-place edits, their tags included, can be undone; labels and changes to the tags themselves (created, renamed, removed) cannot. A map-view request sends its own immediate notification and saves no places.\n\n**Limits,** per token: 1000 calls a day (UTC) and 60 a minute, 200 changes to the map a day; 429 with Retry-After beyond them.\n\n**Conventions.** Times are ISO 8601 in UTC, to the millisecond; coordinates WGS84 degrees. Lists come in pages of up to 200 items: pass `next_cursor` as `cursor` for the next, with the same filters. GET answers carry an ETag (If-None-Match gives 304 while it holds); `updated_since` lists what changed since a time. Errors are `{ \"error\": { \"code\", \"message\" } }`. Adding a place takes an Idempotency-Key.",
     "contact": {
       "name": "Anywhere agent API",
       "url": "https://github.com/fenn-chat/anywhere-api"
@@ -85,99 +85,6 @@
               "application/json": {
                 "schema": {
                   "$ref": "#/components/schemas/Me"
-                }
-              }
-            }
-          },
-          "304": {
-            "description": "Not modified: the If-None-Match ETag still holds"
-          },
-          "400": {
-            "$ref": "#/components/responses/BadRequest"
-          },
-          "401": {
-            "$ref": "#/components/responses/Unauthorized"
-          },
-          "429": {
-            "$ref": "#/components/responses/TooManyRequests"
-          },
-          "503": {
-            "$ref": "#/components/responses/Unavailable"
-          }
-        }
-      }
-    },
-    "/search/places": {
-      "get": {
-        "operationId": "search_places",
-        "tags": [
-          "Places"
-        ],
-        "summary": "Find a venue or street address",
-        "description": "Search Apple Maps for a venue with its city or a street address (kind: address). Returns candidates with coordinates and provider IDs for add_place. Does not change the map. Use list_places for saved places; ask when context cannot distinguish candidates.",
-        "parameters": [
-          {
-            "name": "query",
-            "in": "query",
-            "required": true,
-            "description": "A venue name with its city, or a complete street address. Search Apple Maps before saving a place whose coordinates you do not know.",
-            "schema": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 200
-            }
-          },
-          {
-            "name": "kind",
-            "in": "query",
-            "required": false,
-            "description": "Use address for a street address in any language; venue for a named place",
-            "schema": {
-              "default": "venue",
-              "type": "string",
-              "enum": [
-                "venue",
-                "address"
-              ]
-            }
-          },
-          {
-            "name": "near",
-            "in": "query",
-            "required": false,
-            "description": "Optional location bias as lat,lng; supply only a location relevant to this search",
-            "schema": {
-              "type": "string",
-              "pattern": "^-?\\d+(?:\\.\\d+)?,-?\\d+(?:\\.\\d+)?$"
-            }
-          },
-          {
-            "name": "limit",
-            "in": "query",
-            "required": false,
-            "schema": {
-              "default": 5,
-              "type": "integer",
-              "minimum": 1,
-              "maximum": 5
-            }
-          }
-        ],
-        "responses": {
-          "200": {
-            "description": "OK",
-            "headers": {
-              "ETag": {
-                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/PlaceSearch"
                 }
               }
             }
@@ -1911,7 +1818,7 @@
       "personalToken": {
         "type": "http",
         "scheme": "bearer",
-        "description": "A personal token (anyw_pat_…) made in Anywhere; OAuth access tokens are scoped to the MCP resource"
+        "description": "A personal token (anyw_pat_…) the person made in the Anywhere app"
       }
     },
     "schemas": {
@@ -3501,59 +3408,6 @@
         },
         "required": [
           "error"
-        ],
-        "additionalProperties": false
-      },
-      "PlaceSearch": {
-        "type": "object",
-        "properties": {
-          "places": {
-            "maxItems": 5,
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "name": {
-                  "type": "string"
-                },
-                "lat": {
-                  "type": "number",
-                  "minimum": -90,
-                  "maximum": 90
-                },
-                "lng": {
-                  "type": "number",
-                  "minimum": -180,
-                  "maximum": 180
-                },
-                "address": {
-                  "type": "string"
-                },
-                "category": {
-                  "type": "string"
-                },
-                "provider_ids": {
-                  "type": "array",
-                  "items": {
-                    "type": "string",
-                    "pattern": "^(apple|google):[^\\n]+$",
-                    "description": "apple:<Apple Maps id> or google:<Google place id>"
-                  }
-                }
-              },
-              "required": [
-                "name",
-                "lat",
-                "lng",
-                "provider_ids"
-              ],
-              "additionalProperties": false
-            },
-            "description": "Apple Maps candidates, ready for add_place. Multiple results require disambiguation using the person's known context; a result is not yet saved."
-          }
-        },
-        "required": [
-          "places"
         ],
         "additionalProperties": false
       }

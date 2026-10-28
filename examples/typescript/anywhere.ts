@@ -87,10 +87,6 @@ export interface Me {
   usage: { calls_today: number; map_changes_today: number };
 }
 
-export interface PlaceSearchResult {
-  places: Array<{ name: string; lat: number; lng: number; address?: string; category?: string; provider_ids: string[] }>;
-}
-
 export interface Place {
   id: string;
   kind: "saved" | "visited";
