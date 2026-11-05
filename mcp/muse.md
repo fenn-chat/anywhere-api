@@ -67,6 +67,6 @@ The connection covers the API's existing read and write permissions;
 Anywhere does not currently offer a separate read-only OAuth scope.
 
 Anywhere lists the connection as **Muse** and records its data reads and
-changes. Remove that connection in Anywhere to revoke access. Disconnecting
-through Muse can revoke its OAuth session without affecting another agent's
-connection. Never report a save or deletion until the tool confirms it.
+changes. Disconnect in Muse to remove its saved connection. To revoke
+server-side access immediately, remove that connection in Anywhere.
+Never report a save or deletion until the tool confirms it.
