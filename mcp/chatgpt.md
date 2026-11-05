@@ -1,34 +1,16 @@
 # ChatGPT
 
-Anywhere supports a persistent OAuth connection for ChatGPT and Dot. Start
-with the existing prompt copied from Anywhere; there is no SMS or second
-token paste during connection. Public plugin availability depends on OpenAI
-review and your workspace's plugin policy.
+Install the published Anywhere plugin in ChatGPT and choose **Connect**.
+Enter your existing Anywhere phone number and SMS code on Anywhere's
+browser sign-in page. Never put that number, code or an access token in the
+chat. The plugin uses OAuth and keeps the connection for later chats.
 
-## Connect from the copied prompt
+The Anywhere app's ChatGPT setup copies a prompt that opens the exact
+published plugin. Its connection link is
+[Connect Anywhere](https://chatgpt.com/#settings/Connectors?connector=asdk_app_6ae13ce037f08191832b9b348aa49c42).
+After sign-in, call `list_places` to verify access before reporting success.
 
-1. Paste Anywhere's prompt into your private ChatGPT or Dot conversation.
-2. Open its personal connection link and confirm the Anywhere account shown.
-3. Select **Continue to ChatGPT**, then **Connect** in ChatGPT's connection
-   screen. The account approval carries through automatically.
-4. Ask the assistant to continue the original request. It verifies `get_me`
-   before importing and reports only confirmed saves.
-
-The first link opens a short web handoff; it does not require signing into
-ChatGPT in that browser or returning to the Anywhere app. The connection
-screen opens inside the tested iPhone ChatGPT app. Browser privacy settings
-can affect the handoff, so an unsuccessful connection must be reported
-instead of treated as connected.
-
-The personal link can be used once and expires after 24 hours. It is separate
-from the PAT. Copying again refreshes the link. Once connected, ChatGPT keeps
-refreshable credentials; later conversations do not require another link.
-Revoking the Anywhere grant stops all access through that grant immediately.
-Disconnecting in ChatGPT stops its OAuth connection without revoking a PAT
-used separately by another client.
-
-If you use an older build whose prompt has no connection link, the existing
-personal-token integrations remain available:
+For integrations you configure yourself, personal access keys remain usable:
 
 - **A GPT with an action**, in ChatGPT on the web, desktop and phone: the GPT
   calls Anywhere's REST API, which its OpenAPI document describes.
@@ -37,9 +19,9 @@ personal-token integrations remain available:
 
 ## A token for ChatGPT
 
-In Anywhere: your avatar, **Agents**, **ChatGPT**. Copy the token
-(`anyw_pat_…`); it is shown once. Anywhere then tells you what ChatGPT did by
-its name ("ChatGPT read your history"). More in
+For the GPT action or manually configured MCP client below, choose
+**Other** in Anywhere's agent picker and **Copy access key** (`anyw_pat_…`).
+The published ChatGPT plugin does not need this key. More in
 [Getting a token](../README.md#getting-a-token).
 
 ## A GPT with an action
@@ -93,8 +75,9 @@ the header `Authorization: Bearer anyw_pat_…` in `headers`. OpenAI's
 [MCP guide](https://platform.openai.com/docs/guides/tools-remote-mcp) has
 the details.
 
-## Disconnecting a personal-token integration
+## Disconnecting
 
-In Anywhere, **Agents**, then ChatGPT: revoke the token. The next call from
-the GPT or Codex is refused (`401`). Delete the GPT, or the token from
-Codex's configuration, too.
+Remove the connection in Anywhere to revoke its access. Disconnecting the
+published plugin in ChatGPT revokes that OAuth session. For a manually
+configured GPT or Codex client, revoke its separate access key and remove
+the key from the client's configuration too.

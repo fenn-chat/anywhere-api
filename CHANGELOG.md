@@ -6,6 +6,13 @@ compatible.
 
 ## 2.1.0
 
+- **Muse connection (2026-11-04)**: Muse can connect through browser OAuth with its own registered client,
+  exact callbacks, PKCE and rotating refresh tokens. ChatGPT's existing
+  client and personal-key connections remain supported.
+- Added the [Muse setup guide](mcp/muse.md). Muse's copied app prompt no
+  longer asks for a personal access key. A published Muse directory listing
+  requires Meta's separate review.
+
 - **A place on the phone**: `open_map` (`POST /map/open`) takes `place_id`, a
   place of the person's map: the notification opens that place's panel on
   the map, as a tap on its pin does. `camera` becomes optional with it (the

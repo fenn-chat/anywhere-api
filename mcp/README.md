@@ -1,18 +1,18 @@
 # Connecting an MCP client
 
-Anywhere's MCP server gives authenticated clients the person's map. The
-existing personal token works with both MCP and REST. ChatGPT and Dot can
-also use a persistent OAuth connection started from the app's copied prompt.
+Anywhere's MCP server gives connected agents access to the person's map.
+ChatGPT, Claude and Muse use browser OAuth; other MCP clients can use the same
+personal access key as the REST API.
 
 | | |
 |---|---|
 | URL | `https://anywhere.fenn.chat/mcp` |
 | Transport | Streamable HTTP: stateless, answers in JSON, `POST` only (no event stream to open, no session) |
 | Authentication | The header `Authorization: Bearer anyw_pat_…` ([get a token](../README.md#getting-a-token)) |
-| OAuth | [ChatGPT and Dot](chatgpt.md#connect-from-the-copied-prompt), using a separate one-time connection link |
+| OAuth | ChatGPT and Muse use `/mcp`; Claude uses `/claude/mcp`. Browser sign-in, PKCE S256 and rotating refresh tokens. |
 
-Guides for the agents the app names: [ChatGPT](chatgpt.md) ·
-[Grok](grok.md). Claude and any other client: below.
+Guides: [ChatGPT](chatgpt.md) · [Claude](claude.md) · [Muse](muse.md) ·
+[Grok](grok.md). Other MCP clients: below.
 
 ## Tools
 
@@ -82,25 +82,11 @@ claude mcp add --transport http --scope user anywhere https://anywhere.fenn.chat
   --header "Authorization: Bearer $ANYWHERE_TOKEN"
 ```
 
-## Claude Desktop
+## Claude on the web, desktop and phone
 
-The native OAuth connection currently targets ChatGPT and Dot. Other clients
-can keep using the personal-token workflow. Claude Desktop reaches Anywhere
-through [mcp-remote](https://www.npmjs.com/package/mcp-remote), a local
-bridge: in Settings, Developer, Edit Config, add to
-`claude_desktop_config.json`, then restart Claude.
-
-```json
-{
-  "mcpServers": {
-    "anywhere": {
-      "command": "npx",
-      "args": ["-y", "mcp-remote", "https://anywhere.fenn.chat/mcp", "--header", "Authorization:${AUTH_HEADER}"],
-      "env": { "AUTH_HEADER": "Bearer anyw_pat_…" }
-    }
-  }
-}
-```
+Claude's connectors sign in with OAuth, without a token: add
+`https://anywhere.fenn.chat/claude/mcp` as a custom connector, as
+[Claude](claude.md) says.
 
 ## Cursor
 
@@ -151,4 +137,5 @@ Give the client the URL, the Streamable HTTP transport (sometimes named
 `Bearer anyw_pat_…`, kept the way the client keeps secrets. For OpenClaw:
 `openclaw mcp add anywhere --url https://anywhere.fenn.chat/mcp --transport streamable-http`,
 then the header in its MCP settings. A client that can only launch local
-servers reaches Anywhere through mcp-remote, as Claude Desktop does.
+servers reaches Anywhere through [mcp-remote](https://www.npmjs.com/package/mcp-remote),
+a local bridge, with the header as its `--header` argument.

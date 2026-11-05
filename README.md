@@ -11,16 +11,11 @@ your places, on your phone.
 | REST | `https://anywhere.fenn.chat/api/v1` |
 | MCP | `https://anywhere.fenn.chat/mcp` (Streamable HTTP) |
 | Contract | [`openapi.json`](openapi.json) (OpenAPI 3.1), also served at `https://anywhere.fenn.chat/api/v1/openapi.json` |
-| Authentication | `Authorization: Bearer anyw_pat_…`, a personal token you make in the app |
+| Authentication | Browser OAuth for [ChatGPT](mcp/chatgpt.md), [Claude](mcp/claude.md) and [Muse](mcp/muse.md); a personal access key for REST and other MCP clients |
 
 REST and MCP are one API: each MCP tool is a REST operation under the same
-name, with the same inputs, answers, limits and errors. One token works for
-both.
-
-For ChatGPT and Dot, the app's copied prompt also includes a one-time
-connection link that establishes a persistent OAuth connection. See
-[Connect ChatGPT and Dot](mcp/chatgpt.md#connect-from-the-copied-prompt).
-Other assistants retain the same personal-token/API workflow.
+name, with the same inputs, answers, limits and errors. Personal access keys
+work for both. OAuth tokens are restricted to the MCP resource.
 
 - [What an agent can do](#what-an-agent-can-do)
 - [Quick start](#quick-start)
@@ -114,7 +109,7 @@ For an MCP client (ChatGPT, Claude, Grok, Cursor…), see [MCP](#mcp).
 
 ## Set up your agent
 
-Connect the agent with your personal token, then give it a standing request:
+Connect through the agent's [MCP guide](#mcp), then give it a standing request:
 
 > Send all the important places you already know about me to Anywhere,
 > especially my home, work and school, plus my regular places, favorites and
@@ -128,12 +123,11 @@ Connect the agent with your personal token, then give it a standing request:
 > area, or opening one of my places. Tell me what you saved or changed and
 > how to view it.
 
-The app's **Copy prompt** includes the connection details and the personal
-token. Treat the entire copied prompt as a credential: share it only with
-the private agent conversation you intend to connect. Prefer the client's
-credential store when it offers one. Never publish the prompt or put it in
-a shared chat, repository or log. The documentation and examples use
-`anyw_pat_…` as a placeholder, not a working key.
+The app's **Copy prompt** contains instructions, never a credential. ChatGPT
+and Muse sign in through the browser. For other agents, **Copy access key**
+copies the key separately for the client's secure credential store. Never
+put an access key in a chat, repository, URL or log. The documentation and
+examples use `anyw_pat_…` as a placeholder, not a working key.
 
 REST clients use `https://anywhere.fenn.chat/api/v1` and
 `Authorization: Bearer <your token>`. MCP clients use
@@ -292,11 +286,11 @@ A personal token is made in the Anywhere app, by the person whose map it
 opens:
 
 1. In Anywhere, tap your avatar, then **Agents**.
-2. Choose the agent you are connecting: **ChatGPT**, **Claude**, **Grok**,
-   or another agent, which you name ("OpenClaw on my Mac"). The app tells
-   you what each agent did by this name.
-3. Copy the token. It starts with `anyw_pat_` and is shown once: Anywhere
-   keeps only a hash of it.
+2. Choose **Other** for a script or MCP client that uses an access key.
+   ChatGPT, Claude and Muse use browser sign-in flows instead.
+3. Choose **Copy access key**. It starts with `anyw_pat_`; the device keeps
+   it in its keychain, and the server keeps only its hash. An offline setup
+   becomes usable after its registration syncs.
 
 A token opens the person's whole map: it reads and changes their places, and
 reads their history, current location, available friends' locations and
@@ -321,9 +315,10 @@ Authorization: Bearer anyw_pat_…
 A request without a valid token is refused with `401` and
 `WWW-Authenticate: Bearer realm="anywhere"`. A token in a query string or a
 body is never read. The API sends no CORS headers: tokens belong in agents,
-servers and scripts, never in web pages. OAuth is planned; until
-then, clients that require OAuth (ChatGPT's and Claude's own connectors)
-connect as their guides in [mcp/](mcp/README.md) say.
+servers and scripts, never in web pages. Registered ChatGPT and Muse clients
+use OAuth on `/mcp`; Claude's connectors use `/claude/mcp`. Each flow asks
+the person to confirm their Anywhere phone number in the browser. Follow the
+guides in [mcp/](mcp/README.md) for client-specific setup.
 
 ## The person is told
 
@@ -477,7 +472,9 @@ hints, so clients can ask the person before a change.
 |---|---|
 | Grok | [mcp/grok.md](mcp/grok.md) |
 | ChatGPT | [mcp/chatgpt.md](mcp/chatgpt.md) |
-| Claude, Cursor, VS Code, OpenClaw and any other MCP client | [mcp/README.md](mcp/README.md) |
+| Claude | [mcp/claude.md](mcp/claude.md) |
+| Muse | [mcp/muse.md](mcp/muse.md) |
+| Claude Code, Cursor, VS Code, OpenClaw and any other MCP client | [mcp/README.md](mcp/README.md) |
 
 ## Versions
 
