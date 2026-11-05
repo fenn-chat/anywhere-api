@@ -16,19 +16,22 @@ Claude connects an existing account and never creates one.
 
 ## Add the connector
 
-1. In Claude, open **Customize**, then **Connectors**
-   ([claude.ai/customize/connectors](https://claude.ai/customize/connectors)),
-   on the web or in the desktop app.
-2. Choose **Add custom connector**.
-3. Name: `Anywhere`. URL: `https://anywhere.fenn.chat/claude/mcp`.
-4. Leave the advanced settings as they are: Claude signs in with its own
-   published identity, and Anywhere needs no client ID or secret.
-5. Choose **Add**, then **Connect**. Anywhere's page opens: enter your phone
-   number, then the 4-digit code it texts you. The code's check returns you
-   to Claude, connected.
+[Add Anywhere to Claude](https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=Anywhere&connectorUrl=https://anywhere.fenn.chat/claude/mcp): the link opens Claude's **Add custom
+connector** dialog with the name and URL filled in, on the web, in the
+desktop app or in Claude's iPhone app. Choose **Add**, then **Connect**.
+Anywhere's page opens: enter your phone number, then the 4-digit code it
+texts you. The code's check returns you to Claude, connected.
 
-In Claude's mobile apps, the connector you added on the web or the desktop
-app is there too.
+By hand: in Claude, **Customize**, then **Connectors**
+([claude.ai/customize/connectors](https://claude.ai/customize/connectors)),
+**Add custom connector**, name `Anywhere`, URL
+`https://anywhere.fenn.chat/claude/mcp`. Leave the advanced settings as they
+are: Claude signs in with its own published identity, and Anywhere needs no
+client ID or secret.
+
+The Anywhere app does this for you too: in its agents (onboarding, or your
+avatar, **Agents**), pick **Claude**. It opens a new chat in Claude with a
+prompt that gives Claude this link, then has it fill your map.
 
 On a Team or Enterprise plan, an owner adds the connector for the
 organization first (**Admin settings**, **Connectors**); each member then

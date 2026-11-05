@@ -6,8 +6,9 @@ You do not copy an access key into Muse.
 
 ## Connect
 
-In Anywhere, open your profile, choose **Connect your agent**, then **Muse**
-and copy the prompt. Paste it into a Muse chat. You can also start with:
+Muse is temporarily hidden from Anywhere's agent choices while its directory
+submission is under review. To test a Custom Connector now, paste this into
+a Muse chat:
 
 > Create a Custom Connector named Anywhere for the remote MCP server
 > https://anywhere.fenn.chat/mcp using Streamable HTTP and OAuth. Use client
@@ -17,7 +18,8 @@ and copy the prompt. Paste it into a Muse chat. You can also start with:
 > verify access. Save the working connector as a skill for future chats.
 
 1. Follow Muse's connection link. The Anywhere page must say
-   **Connect Anywhere to Muse**.
+   **Connect Anywhere to Muse**. If Muse's Custom Connector setup first asks
+   for a client ID, enter `muse`; leave the client secret blank.
 2. Enter your Anywhere phone number and the four-digit SMS code on that
    page. The page returns to Muse when verification succeeds.
 3. Let Muse check the connection with `list_places`. A connector created
