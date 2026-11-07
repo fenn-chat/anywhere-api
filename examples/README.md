@@ -47,3 +47,7 @@ project as a start.
 `ANYWHERE_API_URL`, if set, replaces the API's address
 (`https://anywhere.fenn.chat/api/v1`). Every example here runs against the
 API in Anywhere's own tests.
+
+Read your chats with `list_conversations`, then pass a returned id to
+`list_messages` to read that conversation’s retained history. The conversation
+list also accepts a person id to find chats with that member.

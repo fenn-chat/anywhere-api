@@ -89,6 +89,8 @@ export interface Me {
 
 export interface Place {
   id: string;
+  /** Opens the place in Anywhere on the person's iPhone. */
+  url: string;
   kind: "saved" | "visited";
   name: string | null;
   lat: number;
@@ -139,6 +141,7 @@ export interface MapOpenResult {
 export interface Friend {
   id: string;
   name: string | null;
+  sharing: { location: "off" | "live" | "history"; calendar: "off" | "availability" | "full" };
   shares_location: boolean;
   location: Location | null;
 }
@@ -150,7 +153,7 @@ export interface FriendPage {
 
 export interface CalendarEvent {
   id: string;
-  provider: "apple" | "google";
+  provider: "apple" | "google" | null;
   title: string | null;
   location: string | null;
   notes: string | null;
@@ -158,7 +161,7 @@ export interface CalendarEvent {
   end: string;
   all_day: boolean;
   availability: "busy" | "free" | "tentative" | "unavailable";
-  calendar: { id: string; title: string | null; color: string | null };
+  calendar: { id: string; title: string | null; color: string | null } | null;
   link: string | null;
   updated_at: string;
 }

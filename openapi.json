@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Anywhere agent API",
-    "version": "2.1.0",
-    "description": "Read and change a person's Anywhere map: the places they saved and the ones they go to, their visits and trips (all of their history), and where they are now.\n\n**Authentication.** Every call carries the person's personal token, made in the Anywhere app: `Authorization: Bearer anyw_pat_…`. The same token connects an MCP client to `https://anywhere.fenn.chat/mcp` (Streamable HTTP), whose tools are these operations under the same names.\n\n**The person is told.** Reads of places, tags, history, location, shared friends' locations and calendar are recorded and shown in the app, as are edits. Saved-place edits, their tags included, can be undone; labels and changes to the tags themselves (created, renamed, removed) cannot. A map-view request sends its own immediate notification and saves no places.\n\n**Limits,** per token: 1000 calls a day (UTC) and 60 a minute, 200 changes to the map a day; 429 with Retry-After beyond them.\n\n**Conventions.** Times are ISO 8601 in UTC, to the millisecond; coordinates WGS84 degrees. Lists come in pages of up to 200 items: pass `next_cursor` as `cursor` for the next, with the same filters. GET answers carry an ETag (If-None-Match gives 304 while it holds); `updated_since` lists what changed since a time. Errors are `{ \"error\": { \"code\", \"message\" } }`. Adding a place takes an Idempotency-Key.",
+    "version": "2.3.0",
+    "description": "Read and change a person's Anywhere map: the places they saved and the ones they go to, their visits and trips (all of their history), and where they are now.\n\n**Authentication.** Every call carries the person's personal token, made in the Anywhere app: `Authorization: Bearer anyw_pat_…`. The same token connects an MCP client to `https://anywhere.fenn.chat/mcp` (Streamable HTTP), whose tools are these operations under the same names.\n\n**Existing connections.** Personal and OAuth tokens include chat reads and shared context automatically. Other people’s location, history and calendars require their current sharing levels; chats require current membership.\n\n**The person is told.** Reads of places, tags, history, location, friends' shared location, history and calendar, and chats are recorded and shown in the app, as are edits. Saved-place edits, their tags included, can be undone; labels and changes to the tags themselves (created, renamed, removed) cannot. A map-view request sends its own immediate notification and saves no places.\n\n**Limits,** per token: 1000 calls a day (UTC) and 60 a minute, 200 changes to the map a day; 429 with Retry-After beyond them.\n\n**Conventions.** Times are ISO 8601 in UTC, to the millisecond; coordinates WGS84 degrees. Lists come in pages of up to 200 items: pass `next_cursor` as `cursor` for the next, with the same filters. GET answers carry an ETag (If-None-Match gives 304 while it holds); `updated_since` lists what changed since a time. Errors are `{ \"error\": { \"code\", \"message\" } }`. Adding a place takes an Idempotency-Key.",
     "contact": {
       "name": "Anywhere agent API",
       "url": "https://github.com/fenn-chat/anywhere-api"
@@ -50,11 +50,15 @@
     },
     {
       "name": "Friends",
-      "description": "The locations people already share with the person"
+      "description": "The location, history and calendar sharing available from friends"
     },
     {
       "name": "Calendar",
       "description": "The person's calendar events mirrored into Anywhere"
+    },
+    {
+      "name": "Chats",
+      "description": "Conversations you belong to and their message history"
     },
     {
       "name": "Tags",
@@ -723,6 +727,17 @@
             }
           },
           {
+            "name": "person_id",
+            "in": "query",
+            "required": false,
+            "description": "Account id from list_friends or a conversation's member_ids. Omit for your own data; another person's data requires their current sharing permission",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
             "name": "from",
             "in": "query",
             "required": false,
@@ -839,8 +854,19 @@
           "History"
         ],
         "summary": "List the person's visits",
-        "description": "The person's stays at places, newest first: every one ever recorded, or those going on in a range (from, to), to one place (place_id) or to the places in a box (bbox). Each names its place as the map does.",
+        "description": "Visits, newest first, optionally overlapping from/to, at place_id or within bbox. Omit person_id for your own visits; another account requires history sharing. Shared visits expose visited places only. Follow next_cursor for older history.",
         "parameters": [
+          {
+            "name": "person_id",
+            "in": "query",
+            "required": false,
+            "description": "Account id from list_friends or a conversation's member_ids. Omit for your own data; another person's data requires their current sharing permission",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
           {
             "name": "from",
             "in": "query",
@@ -950,6 +976,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
           },
@@ -966,8 +995,19 @@
           "History"
         ],
         "summary": "List the person's trips",
-        "description": "The person's trips, newest first, or those going on in a range (from, to): when, from where to where, how (walking, driving…) and how far. Never a route.",
+        "description": "Trips, newest first, optionally overlapping from/to: when, where, travel mode and distance. Omit person_id for your own trips; another account requires history sharing. Never includes routes. Follow next_cursor for older history.",
         "parameters": [
+          {
+            "name": "person_id",
+            "in": "query",
+            "required": false,
+            "description": "Account id from list_friends or a conversation's member_ids. Omit for your own data; another person's data requires their current sharing permission",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
           {
             "name": "from",
             "in": "query",
@@ -1056,6 +1096,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
           },
@@ -1072,8 +1115,19 @@
           "History"
         ],
         "summary": "Read the person's history",
-        "description": "The person's visits and trips as one timeline, newest first, or what went on in a range (from, to).",
+        "description": "Visits and trips as one timeline, newest first, optionally overlapping from/to. Omit person_id for your own history; another account requires history sharing. Follow next_cursor for older history.",
         "parameters": [
+          {
+            "name": "person_id",
+            "in": "query",
+            "required": false,
+            "description": "Account id from list_friends or a conversation's member_ids. Omit for your own data; another person's data requires their current sharing permission",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
           {
             "name": "from",
             "in": "query",
@@ -1162,6 +1216,9 @@
           "401": {
             "$ref": "#/components/responses/Unauthorized"
           },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
           },
@@ -1178,7 +1235,20 @@
           "Location"
         ],
         "summary": "Where the person is now",
-        "description": "Where the person is, as their phone last reported it: at a place (which, since when) or moving (the trip, its predicted destination and arrival), with the last coordinate and its accuracy. location_not_shared (404) while their phone has shared none.",
+        "description": "Current location: place or trip, predicted arrival and last coordinate. Omit person_id for your own location; another account requires live or history sharing. Returns location_not_shared (404) when unavailable or not shared.",
+        "parameters": [
+          {
+            "name": "person_id",
+            "in": "query",
+            "required": false,
+            "description": "Account id from list_friends or a conversation's member_ids. Omit for your own data; another person's data requires their current sharing permission",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
         "responses": {
           "200": {
             "description": "OK",
@@ -1226,7 +1296,7 @@
           "Map"
         ],
         "summary": "Show a map on the person's phone",
-        "description": "Sends a notification that opens Anywhere at the requested camera, or on a place of the person's map with its panel (place_id), when tapped. Saves no places and never launches the app remotely. sent means FCM accepted a push, not that it was seen. Retry with an idempotency key.",
+        "description": "Sends a notification that opens Anywhere at the requested camera, or on a place of the person's map with its panel (place_id), when tapped. Saves no places and never launches the app remotely. sent means APNs accepted a push, not that it was seen. Retry with an idempotency key.",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -1356,7 +1426,7 @@
           "Friends"
         ],
         "summary": "Read the locations shared with the person",
-        "description": "Lists the people who currently share their location with this person, by account id, with that location. A location is null when not available. Never reads anyone's private location or history. Follow next_cursor for more.",
+        "description": "Lists friends sharing location, history or calendar with this account, their sharing levels and available shared locations. Use an id as person_id for location, history or calendar reads. Blocks and revoked shares take effect immediately. Follow next_cursor for more.",
         "parameters": [
           {
             "name": "limit",
@@ -1426,8 +1496,19 @@
           "Calendar"
         ],
         "summary": "Read the person's calendar",
-        "description": "Lists calendar events mirrored into Anywhere from Apple and Google, earliest first, optionally overlapping a time range. This is the synced window (30 days past, 90 days ahead), not the provider's full calendar. Follow next_cursor for more.",
+        "description": "Calendar events, earliest first, optionally overlapping from/to. Omit person_id for your mirrored calendar (30 days past, 90 ahead). Shared calendars respect availability/full sharing; private notes, calendar metadata and links stay hidden. Follow next_cursor for more.",
         "parameters": [
+          {
+            "name": "person_id",
+            "in": "query",
+            "required": false,
+            "description": "Account id from list_friends or a conversation's member_ids. Omit for your own data; another person's data requires their current sharing permission",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
           {
             "name": "from",
             "in": "query",
@@ -1515,6 +1596,210 @@
           },
           "401": {
             "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/conversations": {
+      "get": {
+        "operationId": "list_conversations",
+        "tags": [
+          "Chats"
+        ],
+        "summary": "Read your chats",
+        "description": "Lists conversations you currently belong to, latest activity first. Filter by person_id for chats with someone. Includes member ids for shared location and calendar lookups. Follow next_cursor for more.",
+        "parameters": [
+          {
+            "name": "person_id",
+            "in": "query",
+            "required": false,
+            "description": "Only conversations including this account id",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Items per page, at most 200",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `next_cursor` of the previous page, with the same filters",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ConversationPage"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/conversations/{conversation_id}/messages": {
+      "get": {
+        "operationId": "list_messages",
+        "tags": [
+          "Chats"
+        ],
+        "summary": "Read a chat's messages",
+        "description": "Reads messages in a conversation you currently belong to, newest first, optionally sent within from/to. Includes messages from other members and retained history. Deleted messages are omitted. Follow next_cursor for older messages.",
+        "parameters": [
+          {
+            "name": "conversation_id",
+            "in": "path",
+            "required": true,
+            "description": "Conversation id from list_conversations",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          {
+            "name": "from",
+            "in": "query",
+            "required": false,
+            "description": "Messages sent at or after this time",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "string",
+                  "format": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "to",
+            "in": "query",
+            "required": false,
+            "description": "Messages sent before this time",
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                {
+                  "type": "string",
+                  "format": "date"
+                }
+              ]
+            }
+          },
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Items per page, at most 200",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `next_cursor` of the previous page, with the same filters",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/MessagePage"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
@@ -1822,12 +2107,1306 @@
       }
     },
     "schemas": {
+      "ConversationPage": {
+        "type": "object",
+        "properties": {
+          "conversations": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "type": {
+                  "type": "string",
+                  "enum": [
+                    "fenn",
+                    "dm",
+                    "group"
+                  ]
+                },
+                "name": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "member_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "admin_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "avatar_url": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "last_message_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "type",
+                "name",
+                "member_ids",
+                "admin_ids",
+                "avatar_url",
+                "last_message_at",
+                "updated_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "description": "Pass as cursor with the same filters for the next page; null on the last page",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "conversations",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "MessagePage": {
+        "type": "object",
+        "properties": {
+          "messages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "conversation_id": {
+                  "type": "string"
+                },
+                "sender_id": {
+                  "type": "string"
+                },
+                "sent_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "edited_at": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "format": "date-time"
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "content": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "text"
+                        },
+                        "text": {
+                          "type": "string"
+                        },
+                        "mentions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "offset": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "length": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "userId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "fallbackName": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "offset",
+                              "length",
+                              "userId",
+                              "fallbackName"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "text"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "medias"
+                        },
+                        "medias": {
+                          "minItems": 1,
+                          "maxItems": 50,
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "type": {
+                                "type": "string",
+                                "enum": [
+                                  "picture",
+                                  "video",
+                                  "gif"
+                                ]
+                              },
+                              "url": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "width": {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              "height": {
+                                "type": "number",
+                                "minimum": 0
+                              },
+                              "blurHash": {
+                                "type": "string"
+                              },
+                              "latitude": {
+                                "type": "number",
+                                "minimum": -90,
+                                "maximum": 90
+                              },
+                              "longitude": {
+                                "type": "number",
+                                "minimum": -180,
+                                "maximum": 180
+                              },
+                              "takenAt": {
+                                "type": "string",
+                                "format": "date-time"
+                              },
+                              "fullSizeUrl": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "thumbnailUrl": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "length": {
+                                "type": "number",
+                                "minimum": 0
+                              }
+                            },
+                            "required": [
+                              "type",
+                              "url",
+                              "width",
+                              "height"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "caption": {
+                          "type": "string"
+                        },
+                        "mentions": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "offset": {
+                                "type": "integer",
+                                "minimum": 0
+                              },
+                              "length": {
+                                "type": "integer",
+                                "minimum": 1
+                              },
+                              "userId": {
+                                "type": "string",
+                                "minLength": 1
+                              },
+                              "fallbackName": {
+                                "type": "string"
+                              }
+                            },
+                            "required": [
+                              "offset",
+                              "length",
+                              "userId",
+                              "fallbackName"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "medias"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "audio"
+                        },
+                        "url": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "duration": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "peaks": {
+                          "type": "string"
+                        },
+                        "transcription": {
+                          "type": "object",
+                          "properties": {
+                            "text": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "text"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "url",
+                        "duration"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "file"
+                        },
+                        "url": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "sizeBytes": {
+                          "type": "integer",
+                          "minimum": 0
+                        },
+                        "thumbnailURL": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "url"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "mapLocation"
+                        },
+                        "latitude": {
+                          "type": "number",
+                          "minimum": -90,
+                          "maximum": 90
+                        },
+                        "longitude": {
+                          "type": "number",
+                          "minimum": -180,
+                          "maximum": 180
+                        },
+                        "description": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "latitude",
+                        "longitude"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "ai"
+                            },
+                            "insightType": {
+                              "type": "string",
+                              "const": "calendarReference"
+                            },
+                            "eventId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "actionType": {
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "insightType",
+                            "eventId"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "type": {
+                              "type": "string",
+                              "const": "ai"
+                            },
+                            "insightType": {
+                              "type": "string",
+                              "const": "locationSubscription"
+                            },
+                            "subscriberId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "targetId": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "kind": {
+                              "type": "string",
+                              "minLength": 1
+                            },
+                            "messageId": {
+                              "type": "string",
+                              "minLength": 1
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "insightType",
+                            "subscriberId",
+                            "targetId",
+                            "kind"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "locationEvent"
+                        },
+                        "targetId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "dwell",
+                            "moving",
+                            "nextDwell",
+                            "nextMoving"
+                          ]
+                        },
+                        "placeType": {
+                          "type": "string",
+                          "enum": [
+                            "home",
+                            "work",
+                            "school",
+                            "other",
+                            "address"
+                          ]
+                        },
+                        "placeName": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "targetId",
+                        "kind"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "fennAnswer"
+                        },
+                        "isComplete": {
+                          "type": "boolean"
+                        },
+                        "chunks": {
+                          "type": "array",
+                          "items": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "text"
+                                  },
+                                  "text": {
+                                    "type": "string"
+                                  },
+                                  "list": {
+                                    "type": "object",
+                                    "properties": {
+                                      "items": {
+                                        "minItems": 1,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "object",
+                                          "properties": {
+                                            "title": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            },
+                                            "detail": {
+                                              "type": "string"
+                                            },
+                                            "icon": {
+                                              "type": "string"
+                                            },
+                                            "url": {
+                                              "type": "string",
+                                              "minLength": 1
+                                            }
+                                          },
+                                          "required": [
+                                            "title"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "items"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "richElement": {
+                                    "type": "object",
+                                    "properties": {
+                                      "kind": {
+                                        "type": "string",
+                                        "enum": [
+                                          "calendarEvent",
+                                          "message",
+                                          "webImage",
+                                          "place",
+                                          "mapLocation",
+                                          "streetView"
+                                        ]
+                                      },
+                                      "title": {
+                                        "type": "string"
+                                      },
+                                      "subtitle": {
+                                        "type": "string"
+                                      },
+                                      "startDate": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      },
+                                      "endDate": {
+                                        "type": "string",
+                                        "format": "date-time"
+                                      },
+                                      "isAllDay": {
+                                        "type": "boolean"
+                                      },
+                                      "conversationId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "eventId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "messageId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "ownerId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "placeId": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "latitude": {
+                                        "type": "number",
+                                        "minimum": -90,
+                                        "maximum": 90
+                                      },
+                                      "longitude": {
+                                        "type": "number",
+                                        "minimum": -180,
+                                        "maximum": 180
+                                      },
+                                      "address": {
+                                        "type": "string"
+                                      },
+                                      "imageURL": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "imageWidth": {
+                                        "type": "number",
+                                        "exclusiveMinimum": 0
+                                      },
+                                      "imageHeight": {
+                                        "type": "number",
+                                        "exclusiveMinimum": 0
+                                      },
+                                      "blurHash": {
+                                        "type": "string"
+                                      },
+                                      "mediaType": {
+                                        "type": "string",
+                                        "enum": [
+                                          "image",
+                                          "gif",
+                                          "video"
+                                        ]
+                                      },
+                                      "mediaURL": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "url": {
+                                        "type": "string",
+                                        "minLength": 1
+                                      },
+                                      "authorName": {
+                                        "type": "string"
+                                      }
+                                    },
+                                    "required": [
+                                      "kind",
+                                      "title"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "text"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "kind": {
+                                    "type": "string",
+                                    "const": "linkCarousel"
+                                  },
+                                  "links": {
+                                    "minItems": 1,
+                                    "type": "array",
+                                    "items": {
+                                      "type": "object",
+                                      "properties": {
+                                        "url": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "title": {
+                                          "type": "string"
+                                        },
+                                        "summary": {
+                                          "type": "string"
+                                        },
+                                        "imageURL": {
+                                          "type": "string",
+                                          "minLength": 1
+                                        },
+                                        "imageWidth": {
+                                          "type": "integer",
+                                          "exclusiveMinimum": 0
+                                        },
+                                        "imageHeight": {
+                                          "type": "integer",
+                                          "exclusiveMinimum": 0
+                                        },
+                                        "accentColor": {
+                                          "type": "string"
+                                        },
+                                        "blurHash": {
+                                          "type": "string"
+                                        },
+                                        "place": {
+                                          "type": "object",
+                                          "properties": {
+                                            "name": {
+                                              "type": "string"
+                                            },
+                                            "lat": {
+                                              "type": "number",
+                                              "minimum": -90,
+                                              "maximum": 90
+                                            },
+                                            "lng": {
+                                              "type": "number",
+                                              "minimum": -180,
+                                              "maximum": 180
+                                            },
+                                            "address": {
+                                              "type": [
+                                                "string",
+                                                "null"
+                                              ]
+                                            },
+                                            "category": {
+                                              "type": [
+                                                "string",
+                                                "null"
+                                              ]
+                                            },
+                                            "ids": {
+                                              "maxItems": 8,
+                                              "type": "array",
+                                              "items": {
+                                                "type": "string",
+                                                "pattern": "^(apple|google):[^\\n]+$"
+                                              }
+                                            },
+                                            "viewport": {
+                                              "anyOf": [
+                                                {
+                                                  "type": "object",
+                                                  "properties": {
+                                                    "south": {
+                                                      "type": "number",
+                                                      "minimum": -90,
+                                                      "maximum": 90
+                                                    },
+                                                    "west": {
+                                                      "type": "number",
+                                                      "minimum": -180,
+                                                      "maximum": 180
+                                                    },
+                                                    "north": {
+                                                      "type": "number",
+                                                      "minimum": -90,
+                                                      "maximum": 90
+                                                    },
+                                                    "east": {
+                                                      "type": "number",
+                                                      "minimum": -180,
+                                                      "maximum": 180
+                                                    }
+                                                  },
+                                                  "required": [
+                                                    "south",
+                                                    "west",
+                                                    "north",
+                                                    "east"
+                                                  ],
+                                                  "additionalProperties": false
+                                                },
+                                                {
+                                                  "type": "null"
+                                                }
+                                              ]
+                                            }
+                                          },
+                                          "required": [
+                                            "name",
+                                            "lat",
+                                            "lng",
+                                            "ids"
+                                          ],
+                                          "additionalProperties": false
+                                        }
+                                      },
+                                      "required": [
+                                        "url",
+                                        "title"
+                                      ],
+                                      "additionalProperties": false
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "kind",
+                                  "links"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "isComplete",
+                        "chunks"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "groupRenamed"
+                        },
+                        "name": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "name"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "groupPhotoChanged"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "deleted"
+                        }
+                      },
+                      "required": [
+                        "type"
+                      ],
+                      "additionalProperties": false
+                    }
+                  ]
+                },
+                "reactions": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string",
+                        "minLength": 1
+                      },
+                      "additionalProperties": {
+                        "type": "object",
+                        "properties": {
+                          "emoji": {
+                            "type": "string"
+                          },
+                          "date": {
+                            "type": "string",
+                            "format": "date-time"
+                          }
+                        },
+                        "required": [
+                          "emoji",
+                          "date"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reply_to_message_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "reply_to_conversation_id": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "link_preview": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "url": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "title": {
+                          "type": "string"
+                        },
+                        "summary": {
+                          "type": "string"
+                        },
+                        "imageURL": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "imageWidth": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
+                        "imageHeight": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0
+                        },
+                        "accentColor": {
+                          "type": "string"
+                        },
+                        "blurHash": {
+                          "type": "string"
+                        },
+                        "place": {
+                          "type": "object",
+                          "properties": {
+                            "name": {
+                              "type": "string"
+                            },
+                            "lat": {
+                              "type": "number",
+                              "minimum": -90,
+                              "maximum": 90
+                            },
+                            "lng": {
+                              "type": "number",
+                              "minimum": -180,
+                              "maximum": 180
+                            },
+                            "address": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "category": {
+                              "type": [
+                                "string",
+                                "null"
+                              ]
+                            },
+                            "ids": {
+                              "maxItems": 8,
+                              "type": "array",
+                              "items": {
+                                "type": "string",
+                                "pattern": "^(apple|google):[^\\n]+$"
+                              }
+                            },
+                            "viewport": {
+                              "anyOf": [
+                                {
+                                  "type": "object",
+                                  "properties": {
+                                    "south": {
+                                      "type": "number",
+                                      "minimum": -90,
+                                      "maximum": 90
+                                    },
+                                    "west": {
+                                      "type": "number",
+                                      "minimum": -180,
+                                      "maximum": 180
+                                    },
+                                    "north": {
+                                      "type": "number",
+                                      "minimum": -90,
+                                      "maximum": 90
+                                    },
+                                    "east": {
+                                      "type": "number",
+                                      "minimum": -180,
+                                      "maximum": 180
+                                    }
+                                  },
+                                  "required": [
+                                    "south",
+                                    "west",
+                                    "north",
+                                    "east"
+                                  ],
+                                  "additionalProperties": false
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "name",
+                            "lat",
+                            "lng",
+                            "ids"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "required": [
+                        "url",
+                        "title"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "hints": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "places": {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "additionalProperties": {
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "action": {
+                                    "type": "string",
+                                    "const": "added"
+                                  },
+                                  "venue": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "lat": {
+                                        "type": "number",
+                                        "minimum": -90,
+                                        "maximum": 90
+                                      },
+                                      "lng": {
+                                        "type": "number",
+                                        "minimum": -180,
+                                        "maximum": 180
+                                      },
+                                      "address": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      },
+                                      "category": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      },
+                                      "ids": {
+                                        "maxItems": 8,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "pattern": "^(apple|google):[^\\n]+$"
+                                        }
+                                      },
+                                      "viewport": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "south": {
+                                                "type": "number",
+                                                "minimum": -90,
+                                                "maximum": 90
+                                              },
+                                              "west": {
+                                                "type": "number",
+                                                "minimum": -180,
+                                                "maximum": 180
+                                              },
+                                              "north": {
+                                                "type": "number",
+                                                "minimum": -90,
+                                                "maximum": 90
+                                              },
+                                              "east": {
+                                                "type": "number",
+                                                "minimum": -180,
+                                                "maximum": 180
+                                              }
+                                            },
+                                            "required": [
+                                              "south",
+                                              "west",
+                                              "north",
+                                              "east"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "lat",
+                                      "lng",
+                                      "ids"
+                                    ],
+                                    "additionalProperties": false
+                                  },
+                                  "placeId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  },
+                                  "mapChangeId": {
+                                    "type": "string",
+                                    "minLength": 1
+                                  }
+                                },
+                                "required": [
+                                  "action",
+                                  "venue",
+                                  "placeId",
+                                  "mapChangeId"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "action": {
+                                    "type": "string",
+                                    "const": "mentioned"
+                                  },
+                                  "venue": {
+                                    "type": "object",
+                                    "properties": {
+                                      "name": {
+                                        "type": "string"
+                                      },
+                                      "lat": {
+                                        "type": "number",
+                                        "minimum": -90,
+                                        "maximum": 90
+                                      },
+                                      "lng": {
+                                        "type": "number",
+                                        "minimum": -180,
+                                        "maximum": 180
+                                      },
+                                      "address": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      },
+                                      "category": {
+                                        "type": [
+                                          "string",
+                                          "null"
+                                        ]
+                                      },
+                                      "ids": {
+                                        "maxItems": 8,
+                                        "type": "array",
+                                        "items": {
+                                          "type": "string",
+                                          "pattern": "^(apple|google):[^\\n]+$"
+                                        }
+                                      },
+                                      "viewport": {
+                                        "anyOf": [
+                                          {
+                                            "type": "object",
+                                            "properties": {
+                                              "south": {
+                                                "type": "number",
+                                                "minimum": -90,
+                                                "maximum": 90
+                                              },
+                                              "west": {
+                                                "type": "number",
+                                                "minimum": -180,
+                                                "maximum": 180
+                                              },
+                                              "north": {
+                                                "type": "number",
+                                                "minimum": -90,
+                                                "maximum": 90
+                                              },
+                                              "east": {
+                                                "type": "number",
+                                                "minimum": -180,
+                                                "maximum": 180
+                                              }
+                                            },
+                                            "required": [
+                                              "south",
+                                              "west",
+                                              "north",
+                                              "east"
+                                            ],
+                                            "additionalProperties": false
+                                          },
+                                          {
+                                            "type": "null"
+                                          }
+                                        ]
+                                      }
+                                    },
+                                    "required": [
+                                      "name",
+                                      "lat",
+                                      "lng",
+                                      "ids"
+                                    ],
+                                    "additionalProperties": false
+                                  }
+                                },
+                                "required": [
+                                  "action",
+                                  "venue"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
+                          }
+                        }
+                      },
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                }
+              },
+              "required": [
+                "id",
+                "conversation_id",
+                "sender_id",
+                "sent_at",
+                "edited_at",
+                "content",
+                "reactions",
+                "reply_to_message_id",
+                "reply_to_conversation_id",
+                "link_preview",
+                "hints",
+                "updated_at"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "description": "Pass as cursor with the same filters for the next page; null on the last page",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "messages",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
       "Place": {
         "type": "object",
         "properties": {
           "id": {
             "type": "string",
             "description": "The place's id: a saved place's own, or, for a place the person goes to without having saved it, the location engine's"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri",
+            "description": "Opens the place in Anywhere on the person's iPhone, its pin focused on the map with its panel: the link to give the person for a place you added, changed or found"
           },
           "kind": {
             "type": "string",
@@ -2011,6 +3590,7 @@
         },
         "required": [
           "id",
+          "url",
           "kind",
           "name",
           "lat",
@@ -3038,7 +4618,7 @@
               "sent",
               "unavailable"
             ],
-            "description": "sent: at least one push accepted by FCM; unavailable: no usable registered installation or delivery attempts exhausted. Neither confirms the person saw or opened it"
+            "description": "sent: at least one push accepted by APNs, Apple's push service; unavailable: no usable registered installation or delivery attempts exhausted. Neither confirms the person saw or opened it"
           },
           "camera": {
             "$ref": "#/components/schemas/MapCamera"
@@ -3050,7 +4630,7 @@
           "notifications_sent": {
             "type": "integer",
             "minimum": 0,
-            "description": "Installations for which FCM accepted this notification"
+            "description": "Installations for which APNs accepted this notification"
           }
         },
         "required": [
@@ -3065,7 +4645,7 @@
         "properties": {
           "id": {
             "type": "string",
-            "description": "The account id of someone who shares their location with the person"
+            "description": "The account id to pass as person_id for shared location, history or calendar"
           },
           "name": {
             "type": [
@@ -3073,9 +4653,36 @@
               "null"
             ]
           },
+          "sharing": {
+            "type": "object",
+            "properties": {
+              "location": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "live",
+                  "history"
+                ]
+              },
+              "calendar": {
+                "type": "string",
+                "enum": [
+                  "off",
+                  "availability",
+                  "full"
+                ]
+              }
+            },
+            "required": [
+              "location",
+              "calendar"
+            ],
+            "additionalProperties": false,
+            "description": "What this person currently shares with the account"
+          },
           "shares_location": {
             "type": "boolean",
-            "description": "Whether they currently share their location with the person: always true in this list"
+            "description": "Whether they currently share live location or history with the account"
           },
           "location": {
             "anyOf": [
@@ -3092,6 +4699,7 @@
         "required": [
           "id",
           "name",
+          "sharing",
           "shares_location",
           "location"
         ],
@@ -3127,11 +4735,19 @@
             "type": "string"
           },
           "provider": {
-            "type": "string",
-            "enum": [
-              "apple",
-              "google"
-            ]
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "apple",
+                  "google"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "null for a shared calendar"
           },
           "title": {
             "type": [
@@ -3172,30 +4788,38 @@
             ]
           },
           "calendar": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string"
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "color": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "color"
+                ],
+                "additionalProperties": false
               },
-              "title": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "color": {
-                "type": [
-                  "string",
-                  "null"
-                ]
+              {
+                "type": "null"
               }
-            },
-            "required": [
-              "id",
-              "title",
-              "color"
             ],
-            "additionalProperties": false
+            "description": "null for a shared calendar"
           },
           "link": {
             "type": [
@@ -3441,7 +5065,7 @@
         }
       },
       "NotFound": {
-        "description": "No such place on the map (place_not_found), tag (tag_not_found), path (not_found) or location (location_not_shared)",
+        "description": "No such place on the map (place_not_found), tag (tag_not_found), path (not_found), location (location_not_shared), shared history/calendar (history_not_shared, calendar_not_shared) or accessible conversation (conversation_not_found)",
         "content": {
           "application/json": {
             "schema": {

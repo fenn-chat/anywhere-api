@@ -4,6 +4,27 @@ The agent API's changes, newest first. The version is `info.version` in
 [`openapi.json`](openapi.json); paths stay under `/v1` while every change is
 compatible.
 
+## 2.3.0
+
+- **Chats and shared context (2026-11-06)**: `list_conversations` and
+  `list_messages` read your chats and their retained message history.
+- Location, visits, trips, history and calendar reads accept `person_id`.
+  Friends' current sharing levels, blocks and conversation membership
+  govern access on every call. Calendar availability stays redacted.
+- `list_friends` includes calendar-only sharers and reports sharing levels.
+  Shared calendar events have null provider and calendar metadata.
+- Existing personal and OAuth tokens have these capabilities immediately;
+  no new token or reconnect is required. Reads remain metered and recorded.
+
+## 2.2.0
+
+- **A place's link (2026-11-05)**: every `Place` has `url`,
+  `https://anywhere.fenn.chat/p/<id>`, which opens the place in Anywhere on
+  the person's iPhone, its pin focused on the map with its panel, as a tap on
+  it does. Give it to the person for the places you add, change or find.
+- **Claude Code** signs in with OAuth at `/claude/mcp`, as Claude does:
+  [Claude](mcp/claude.md#claude-code-and-your-own-apps).
+
 ## 2.1.0
 
 - **Muse connection (2026-11-04)**: Muse can connect through browser OAuth with its own registered client,

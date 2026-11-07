@@ -16,22 +16,20 @@ Claude connects an existing account and never creates one.
 
 ## Add the connector
 
-[Add Anywhere to Claude](https://claude.ai/customize/connectors?modal=add-custom-connector&connectorName=Anywhere&connectorUrl=https://anywhere.fenn.chat/claude/mcp): the link opens Claude's **Add custom
-connector** dialog with the name and URL filled in, on the web, in the
-desktop app or in Claude's iPhone app. Choose **Add**, then **Connect**.
+Anywhere is in Claude's Connectors Directory:
+[claude.ai/directory/anywhere](https://claude.ai/directory/anywhere), or
+search for Anywhere in **Customize**, **Connectors**. Choose **Connect**.
 Anywhere's page opens: enter your phone number, then the 4-digit code it
-texts you. The code's check returns you to Claude, connected.
+texts you. The code's check returns you to Claude, connected. Connecting once
+connects Claude on the web, in its desktop app and in its phone apps.
 
-By hand: in Claude, **Customize**, then **Connectors**
+As a custom connector instead (Claude then shows another icon): in Claude,
+**Customize**, then **Connectors**
 ([claude.ai/customize/connectors](https://claude.ai/customize/connectors)),
 **Add custom connector**, name `Anywhere`, URL
 `https://anywhere.fenn.chat/claude/mcp`. Leave the advanced settings as they
 are: Claude signs in with its own published identity, and Anywhere needs no
 client ID or secret.
-
-The Anywhere app does this for you too: in its agents (onboarding, or your
-avatar, **Agents**), pick **Claude**. It opens a new chat in Claude with a
-prompt that gives Claude this link, then has it fill your map.
 
 On a Team or Enterprise plan, an owner adds the connector for the
 organization first (**Admin settings**, **Connectors**); each member then
@@ -59,10 +57,19 @@ again from Claude whenever you like.
 
 ## Claude Code and your own apps
 
-Claude Code connects with a personal token, sent as a header on every call
-to `https://anywhere.fenn.chat/mcp`: see
+Claude Code signs in the same way, with the same URL: add it, then run
+`/mcp` in Claude Code, choose Anywhere and **Authenticate**. Your browser
+opens Anywhere's page for your phone number and code, then returns to Claude
+Code, connected. Anywhere lists the connection as **Claude Code**.
+
+```shell
+claude mcp add --transport http --scope user anywhere https://anywhere.fenn.chat/claude/mcp
+```
+
+Claude Code can also connect with a personal token instead, sent as a header
+on every call to `https://anywhere.fenn.chat/mcp`: see
 [Claude Code](README.md#claude-code). An app of your own on Claude's API
-gives Claude Anywhere through the API's MCP connector, with the same URL and
+gives Claude Anywhere through the API's MCP connector, with that URL and
 the personal token as its authorization token.
 
 ## When something is off

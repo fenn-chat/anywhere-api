@@ -2,7 +2,8 @@
 
 Let an agent read and change your [Anywhere](https://anywhere.fenn.chat) map:
 the places you saved and the ones you go to, every visit and trip you made,
-where you are now, your friends' shared locations and your calendar. Agents
+where you are now, your chats and calendar, and the locations, history and
+calendars your friends share with you. Agents
 can also send a notification that opens a particular map view, or one of
 your places, on your phone.
 
@@ -48,8 +49,10 @@ work for both. OAuth tokens are restricted to the MCP resource.
 | Visits and trips as one timeline | `GET /history` | `get_history` | [curl](examples/curl/get_history.sh) · [Python](examples/python/get_history.py) · [TypeScript](examples/typescript/get_history.ts) |
 | Where the person is now | `GET /location` | `get_current_location` | [curl](examples/curl/get_current_location.sh) · [Python](examples/python/get_current_location.py) · [TypeScript](examples/typescript/get_current_location.ts) |
 | Send a notification that opens a map view or a place on the phone | `POST /map/open` | `open_map` | [curl](examples/curl/open_map.sh) · [Python](examples/python/open_map.py) · [TypeScript](examples/typescript/open_map.ts) |
-| Friends and the locations they share with the person | `GET /friends` | `list_friends` | [curl](examples/curl/list_friends.sh) · [Python](examples/python/list_friends.py) · [TypeScript](examples/typescript/list_friends.ts) |
-| The person's mirrored calendar events | `GET /calendar/events` | `list_calendar_events` | [curl](examples/curl/list_calendar_events.sh) · [Python](examples/python/list_calendar_events.py) · [TypeScript](examples/typescript/list_calendar_events.ts) |
+| Friends, their sharing levels and available shared locations | `GET /friends` | `list_friends` | [curl](examples/curl/list_friends.sh) · [Python](examples/python/list_friends.py) · [TypeScript](examples/typescript/list_friends.ts) |
+| Own or shared calendar events; optional `person_id` | `GET /calendar/events` | `list_calendar_events` | [curl](examples/curl/list_calendar_events.sh) · [Python](examples/python/list_calendar_events.py) · [TypeScript](examples/typescript/list_calendar_events.ts) |
+| Your conversations, optionally with one person | `GET /conversations` | `list_conversations` | [curl](examples/curl/list_conversations.sh) · [Python](examples/python/list_conversations.py) · [TypeScript](examples/typescript/list_conversations.ts) |
+| A conversation's messages and retained history | `GET /conversations/{conversation_id}/messages` | `list_messages` | [curl](examples/curl/list_messages.sh) · [Python](examples/python/list_messages.py) · [TypeScript](examples/typescript/list_messages.ts) |
 | Read the tags: the standard ones and the person's own | `GET /tags` | `list_tags` | [curl](examples/curl/list_tags.sh) · [Python](examples/python/list_tags.py) · [TypeScript](examples/typescript/list_tags.ts) |
 | Create a tag | `POST /tags` | `create_tag` | [curl](examples/curl/create_tag.sh) · [Python](examples/python/create_tag.py) · [TypeScript](examples/typescript/create_tag.ts) |
 | Rename a tag | `PATCH /tags/{tag_id}` | `update_tag` | [curl](examples/curl/update_tag.sh) · [Python](examples/python/update_tag.py) · [TypeScript](examples/typescript/update_tag.ts) |
@@ -70,16 +73,29 @@ What each takes and answers, field by field, is in [`openapi.json`](openapi.json
   route.
 - **Location** is the person's phone's last report: at a place since a time,
   or moving, with the trip's predicted destination and arrival.
-- **Friends** are the person's active, unblocked friends. Each includes only
-  the current location that friend shares with the person, or `null` when
-  sharing is off or no report is available. A token cannot read a friend's
-  private history or calendar, enable their sharing, or bypass a block.
+- **Friends** lists active, unblocked friends who share location, history or
+  calendar. Their `sharing` gives each level. Pass a friend's `id` as
+  `person_id` to `/location`, `/visits`, `/trips`, `/history` or
+  `/calendar/events` (the same argument on their MCP tools). Omit it for
+  your own data. Live location requires `live` or `history`; visits and
+  trips require `history`. A revoked share or a block takes effect on the
+  next call, even before old shared copies are removed.
+- **Chats** are the conversations you currently belong to. Filter
+  `/conversations` by `person_id` to find chats with someone, then read
+  `/conversations/{conversation_id}/messages`. Messages are newest first;
+  follow `next_cursor` for all retained history, or filter by `from`/`to`.
+  Removed members lose access immediately. Deleted messages are omitted.
+  Chat access is read-only.
 - **Calendar** is the person's events already mirrored from their devices
   and connected Google Calendar, normally 30 days back to 90 days ahead.
   Events appear once per occurrence, soonest first, with their full notes,
   calendar, location text and availability. This is read-only: changes belong
   in the source calendar. It makes no request to Apple or Google during an
-  API call. Disconnecting Google hides its copies immediately.
+  API call. Disconnecting Google hides its copies immediately. With
+  `person_id`, only that friend's shared calendar is returned: `availability`
+  sharing reveals time and availability; `full` also reveals title and
+  location. Notes, provider, calendar metadata and links stay private and
+  are `null` for shared events.
 - **Changes** go to the person's map at once, and the person can undo each
   saved-place change in the app. Saving a venue already on the map (the same Apple Maps or
   Google id, or the same name within 100 m) never adds it twice.
@@ -111,17 +127,18 @@ For an MCP client (ChatGPT, Claude, Grok, Cursor…), see [MCP](#mcp).
 
 Connect through the agent's [MCP guide](#mcp), then give it a standing request:
 
-> Send all the important places you already know about me to Anywhere,
-> especially my home, work and school, plus my regular places, favorites and
-> places I want to go. Check what is already there first. Use only places
+> Send all the relevant places you already know about me to Anywhere,
+> including but not limited to my home, work and school, my regular places,
+> favorites and places I want to go. Check what is already there first. Use only places
 > you can identify reliably; ask me about missing or ambiguous addresses.
 > Keep these places up to date: add new important places you learn about, and
 > add useful new information about existing places to their notes while
 > preserving what is already there. Apply my corrections. For map-related
 > requests, prefer showing the result in Anywhere on my phone: use open_map
 > to send a notification with the camera centered and zoomed on the relevant
-> area, or opening one of my places. Tell me what you saved or changed and
-> how to view it.
+> area, or opening one of my places. Then say "I added those to your map:"
+> with each place you added or updated, linked to its url (it opens the place
+> in Anywhere), or, if you added none, "I couldn't add any."
 
 The app's **Copy prompt** contains instructions, never a credential. ChatGPT
 and Muse sign in through the browser. For other agents, **Copy access key**
@@ -293,8 +310,11 @@ opens:
    becomes usable after its registration syncs.
 
 A token opens the person's whole map: it reads and changes their places, and
-reads their history, current location, available friends' locations and
-mirrored calendar, and can send map-view notifications. There are no scopes yet.
+reads their history, current location, mirrored calendar and chats, plus the
+locations, history and calendars friends currently share with them. It can
+also send map-view notifications. Existing personal and OAuth tokens gain
+these read capabilities automatically; no token replacement or reconnection
+is needed. There are no per-capability scopes.
 Keep it out of code, logs, URLs and shared conversations; give it to the
 agent the way the agent keeps secrets (its connector's credential, a secret
 store, an environment variable), or use the app's private setup prompt as
@@ -323,7 +343,7 @@ guides in [mcp/](mcp/README.md) for client-specific setup.
 ## The person is told
 
 Anywhere records every call that reads or changes the person's places,
-tags, history, location, friends or calendar, and tells them: a notification per agent, sent once the
+tags, history, location, friends, calendars or chats, and tells them: a notification per agent, sent once the
 agent pauses (a minute after its last call, at most three minutes after its
 first), in words like "Grok added Café de Flore to your map" or "ChatGPT
 read your history". The app lists each agent's activity for 90 days, and
@@ -369,7 +389,10 @@ agents:
 | 401 | `invalid_token` | No token, a malformed or unknown one, or a revoked one |
 | 404 | `place_not_found` | No such place on the map |
 | 404 | `tag_not_found` | No such tag: neither a standard one nor one of the person's |
-| 404 | `location_not_shared` | The person's phone has shared no location yet |
+| 404 | `location_not_shared` | No location is available under the current sharing permission |
+| 404 | `history_not_shared` | This person does not currently share history with you |
+| 404 | `calendar_not_shared` | This person does not currently share their calendar with you |
+| 404 | `conversation_not_found` | No such conversation with your current membership |
 | 404 | `not_found` | No such path |
 | 405 | `method_not_allowed` | The path takes other methods (`Allow` names them) |
 | 409 | `not_saved` | A `visited` place takes a label and nothing else: save it first (`POST /places`) for other edits; only the person hides it |
@@ -392,7 +415,8 @@ token is refused before any MCP, with HTTP `401`.
 ## Pages
 
 Lists (`/places`, `/visits`, `/trips`, `/history`, a place's visits,
-`/friends`, `/calendar/events`, `/tags`) come in
+`/friends`, `/calendar/events`, `/tags`, `/conversations`,
+`/conversations/{conversation_id}/messages`) come in
 pages: `limit` items (50 by default, 200 at most), most recent first (or
 nearest first with `near`; calendar events are soonest first, friends are
 by id, tags the standard ones first, then the person's own by id), and a `next_cursor`. Pass it as `cursor`, with

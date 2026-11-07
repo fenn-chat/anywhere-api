@@ -1,15 +1,15 @@
 # Connecting an MCP client
 
 Anywhere's MCP server gives connected agents access to the person's map.
-ChatGPT, Claude and Muse use browser OAuth; other MCP clients can use the same
-personal access key as the REST API.
+ChatGPT, Claude, Claude Code and Muse use browser OAuth; other MCP clients can
+use the same personal access key as the REST API.
 
 | | |
 |---|---|
 | URL | `https://anywhere.fenn.chat/mcp` |
 | Transport | Streamable HTTP: stateless, answers in JSON, `POST` only (no event stream to open, no session) |
 | Authentication | The header `Authorization: Bearer anyw_pat_…` ([get a token](../README.md#getting-a-token)) |
-| OAuth | ChatGPT and Muse use `/mcp`; Claude uses `/claude/mcp`. Browser sign-in, PKCE S256 and rotating refresh tokens. |
+| OAuth | ChatGPT and Muse use `/mcp`; Claude and Claude Code use `/claude/mcp`. Browser sign-in, PKCE S256 and rotating refresh tokens. |
 
 Guides: [ChatGPT](chatgpt.md) · [Claude](claude.md) · [Muse](muse.md) ·
 [Grok](grok.md). Other MCP clients: below.
@@ -27,10 +27,12 @@ Guides: [ChatGPT](chatgpt.md) · [Claude](claude.md) · [Muse](muse.md) ·
 | `list_visits` | Visits: in a range, to a place, or in a box | read-only |
 | `list_trips` | Trips: when, from where to where, how, how far | read-only |
 | `get_history` | Visits and trips as one timeline | read-only |
-| `get_current_location` | Where the person is now | read-only |
+| `get_current_location` | Own or shared current location; optional `person_id` | read-only |
 | `open_map` | Sends a notification that opens a specified camera view, or a place with its panel (`place_id`), in Anywhere | sends a notification |
-| `list_friends` | Friends and the current locations they share with the person | read-only |
-| `list_calendar_events` | The person's mirrored calendar events, by time range | read-only |
+| `list_friends` | Friends, their sharing levels and available shared locations | read-only |
+| `list_calendar_events` | Own or shared calendar events, by time range; optional `person_id` | read-only |
+| `list_conversations` | Your chats, optionally filtered by `person_id` | read-only |
+| `list_messages` | A chat's retained message history, newest first | read-only |
 | `list_tags` | The tags: the standard favorite and wantToGo, then the person's own | read-only |
 | `create_tag` | Creates a tag of the person's own | changes the map |
 | `update_tag` | Renames a tag of the person's own | changes the map, destructive |
@@ -50,6 +52,10 @@ request to keep their important places current. See
 for seeding home, work and other known places, and
 [showing results on the phone](../README.md#show-map-results-on-your-phone)
 for what the current API can display.
+
+Location, visits, trips and history tools also accept `person_id`. Shared
+data follows current sharing levels and blocks; chats require current
+membership. Existing tokens have these reads automatically.
 
 ## Check the connection
 
@@ -76,6 +82,15 @@ curl -sS --fail-with-body https://anywhere.fenn.chat/mcp \
 A wrong or revoked token is answered `401` before any MCP.
 
 ## Claude Code
+
+With OAuth, no token: add Claude's URL, then run `/mcp` in Claude Code,
+choose Anywhere and **Authenticate**, as [Claude](claude.md#claude-code-and-your-own-apps) says.
+
+```shell
+claude mcp add --transport http --scope user anywhere https://anywhere.fenn.chat/claude/mcp
+```
+
+Or with a personal token:
 
 ```shell
 claude mcp add --transport http --scope user anywhere https://anywhere.fenn.chat/mcp \
