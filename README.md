@@ -12,7 +12,7 @@ your places, on your phone.
 | REST | `https://anywhere.fenn.chat/api/v1` |
 | MCP | `https://anywhere.fenn.chat/mcp` (Streamable HTTP) |
 | Contract | [`openapi.json`](openapi.json) (OpenAPI 3.1), also served at `https://anywhere.fenn.chat/api/v1/openapi.json` |
-| Authentication | Browser OAuth for [ChatGPT](mcp/chatgpt.md), [Claude](mcp/claude.md) and [Muse](mcp/muse.md); a personal access key for REST and other MCP clients |
+| Authentication | Browser OAuth for [ChatGPT](mcp/chatgpt.md), [Claude](mcp/claude.md), [Muse](mcp/muse.md) and [Grok Bot](mcp/grok-bot.md); a personal access key for REST and other MCP clients |
 
 REST and MCP are one API: each MCP tool is a REST operation under the same
 name, with the same inputs, answers, limits and errors. Personal access keys
@@ -140,8 +140,8 @@ Connect through the agent's [MCP guide](#mcp), then give it a standing request:
 > with each place you added or updated, linked to its url (it opens the place
 > in Anywhere), or, if you added none, "I couldn't add any."
 
-The app's **Copy prompt** contains instructions, never a credential. ChatGPT
-and Muse sign in through the browser. For other agents, **Copy access key**
+The app's **Copy prompt** contains instructions, never a credential. ChatGPT,
+Claude, Muse and Grok Bot sign in through the browser. For other agents, **Copy access key**
 copies the key separately for the client's secure credential store. Never
 put an access key in a chat, repository, URL or log. The documentation and
 examples use `anyw_pat_…` as a placeholder, not a working key.
@@ -304,7 +304,7 @@ opens:
 
 1. In Anywhere, tap your avatar, then **Agents**.
 2. Choose **Other** for a script or MCP client that uses an access key.
-   ChatGPT, Claude and Muse use browser sign-in flows instead.
+   ChatGPT, Claude, Muse and Grok Bot use browser sign-in flows instead.
 3. Choose **Copy access key**. It starts with `anyw_pat_`; the device keeps
    it in its keychain, and the server keeps only its hash. An offline setup
    becomes usable after its registration syncs.
@@ -336,7 +336,8 @@ A request without a valid token is refused with `401` and
 `WWW-Authenticate: Bearer realm="anywhere"`. A token in a query string or a
 body is never read. The API sends no CORS headers: tokens belong in agents,
 servers and scripts, never in web pages. Registered ChatGPT and Muse clients
-use OAuth on `/mcp`; Claude's connectors use `/claude/mcp`. Each flow asks
+use OAuth on `/mcp`; Claude's connectors use `/claude/mcp` and Grok Bot uses
+`/grok/mcp`. Each flow asks
 the person to confirm their Anywhere phone number in the browser. Follow the
 guides in [mcp/](mcp/README.md) for client-specific setup.
 
@@ -495,6 +496,7 @@ hints, so clients can ask the person before a change.
 | Client | Guide |
 |---|---|
 | Grok | [mcp/grok.md](mcp/grok.md) |
+| Grok Bot | [mcp/grok-bot.md](mcp/grok-bot.md) |
 | ChatGPT | [mcp/chatgpt.md](mcp/chatgpt.md) |
 | Claude | [mcp/claude.md](mcp/claude.md) |
 | Muse | [mcp/muse.md](mcp/muse.md) |

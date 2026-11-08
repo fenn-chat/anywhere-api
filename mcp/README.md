@@ -1,7 +1,7 @@
 # Connecting an MCP client
 
 Anywhere's MCP server gives connected agents access to the person's map.
-ChatGPT, Claude, Claude Code and Muse use browser OAuth; other MCP clients can
+ChatGPT, Claude, Claude Code, Muse and Grok Bot use browser OAuth; other MCP clients can
 use the same personal access key as the REST API.
 
 | | |
@@ -9,10 +9,10 @@ use the same personal access key as the REST API.
 | URL | `https://anywhere.fenn.chat/mcp` |
 | Transport | Streamable HTTP: stateless, answers in JSON, `POST` only (no event stream to open, no session) |
 | Authentication | The header `Authorization: Bearer anyw_pat_…` ([get a token](../README.md#getting-a-token)) |
-| OAuth | ChatGPT and Muse use `/mcp`; Claude and Claude Code use `/claude/mcp`. Browser sign-in, PKCE S256 and rotating refresh tokens. |
+| OAuth | ChatGPT and Muse use `/mcp`; Claude and Claude Code use `/claude/mcp`; Grok Bot uses `/grok/mcp`. Browser sign-in, PKCE S256 and rotating refresh tokens. |
 
 Guides: [ChatGPT](chatgpt.md) · [Claude](claude.md) · [Muse](muse.md) ·
-[Grok](grok.md). Other MCP clients: below.
+[Grok Bot](grok-bot.md) · [Grok](grok.md). Other MCP clients: below.
 
 ## Tools
 

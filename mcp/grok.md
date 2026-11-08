@@ -1,13 +1,16 @@
 # Grok
 
+For the Grok Bot app, use [Grok Bot's browser sign-in](grok-bot.md).
+This page covers ordinary Grok chat and applications using the xAI API.
+
 Grok connects to Anywhere's MCP server as a custom connector, with your
 personal token.
 
 ## 1. Make a token for Grok
 
-In Anywhere: your avatar, **Agents**, **Grok**. Copy the token
-(`anyw_pat_…`); it is shown once. Anywhere then tells you what Grok did by
-its name ("Grok added 2 places to your map"). More in
+In Anywhere: your avatar, **Agents**, **Other**, then **Copy access key**.
+Keep the token (`anyw_pat_…`) in Grok's connector credentials, never in a
+chat. Anywhere records reads and changes under the connection's name. More in
 [Getting a token](../README.md#getting-a-token).
 
 ## 2. Add the connector in Grok
