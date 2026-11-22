@@ -1,7 +1,7 @@
 // PATCH /places/{place_id}: the person loves a saved place now: it takes the
 // favorite tag in place of wantToGo, five stars and a note. Give only what
 // changes: add_tags, remove_tags (its other tags stay), rating, note, name, or
-// label (home, work, school: the one change a visited place takes).
+// label (home, work, school). A visited place accepts name and label.
 // Usage: node update_place.ts <place_id>
 import { call, placePath, type WriteResult } from "./anywhere.ts";
 

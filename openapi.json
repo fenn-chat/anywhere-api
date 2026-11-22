@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Anywhere agent API",
-    "version": "2.3.0",
-    "description": "Read and change a person's Anywhere map: the places they saved and the ones they go to, their visits and trips (all of their history), and where they are now.\n\n**Authentication.** Every call carries the person's personal token, made in the Anywhere app: `Authorization: Bearer anyw_pat_…`. The same token connects an MCP client to `https://anywhere.fenn.chat/mcp` (Streamable HTTP), whose tools are these operations under the same names.\n\n**Existing connections.** Personal and OAuth tokens include chat reads and shared context automatically. Other people’s location, history and calendars require their current sharing levels; chats require current membership.\n\n**The person is told.** Reads of places, tags, history, location, friends' shared location, history and calendar, and chats are recorded and shown in the app, as are edits. Saved-place edits, their tags included, can be undone; labels and changes to the tags themselves (created, renamed, removed) cannot. A map-view request sends its own immediate notification and saves no places.\n\n**Limits,** per token: 1000 calls a day (UTC) and 60 a minute, 200 changes to the map a day; 429 with Retry-After beyond them.\n\n**Conventions.** Times are ISO 8601 in UTC, to the millisecond; coordinates WGS84 degrees. Lists come in pages of up to 200 items: pass `next_cursor` as `cursor` for the next, with the same filters. GET answers carry an ETag (If-None-Match gives 304 while it holds); `updated_since` lists what changed since a time. Errors are `{ \"error\": { \"code\", \"message\" } }`. Adding a place takes an Idempotency-Key.",
+    "version": "2.5.0",
+    "description": "Read and change a person's Anywhere map: the places they saved and the ones they go to, their visits and trips (all of their history), and where they are now.\n\n**Authentication.** Every call carries the person's personal token, made in the Anywhere app: `Authorization: Bearer anyw_pat_…`. The same token connects an MCP client to `https://anywhere.fenn.chat/mcp` (Streamable HTTP), whose tools are these operations under the same names.\n\n**Existing connections.** Personal and OAuth tokens include chat reads and shared context automatically. Other people’s location, history and calendars require their current sharing levels; chats require current membership.\n\n**The person is told.** Reads of places, tags, history, location, friends' shared location, history and calendar, and chats are recorded and shown in the app, as are edits. Saved-place edits, their tags included, can be undone; visit corrections, visited-place edits and changes to the tags themselves (created, renamed, removed) cannot. A map-view request sends its own immediate notification and saves no places.\n\n**Limits,** per token: 1000 calls a day (UTC) and 60 a minute, 200 changes to the map a day; 429 with Retry-After beyond them.\n\n**Conventions.** Times are ISO 8601 in UTC, to the millisecond; coordinates WGS84 degrees. Lists come in pages of up to 200 items: pass `next_cursor` as `cursor` for the next, with the same filters. GET answers carry an ETag (If-None-Match gives 304 while it holds); `updated_since` lists what changed since a time. Errors are `{ \"error\": { \"code\", \"message\" } }`. Adding a place takes an Idempotency-Key.",
     "contact": {
       "name": "Anywhere agent API",
       "url": "https://github.com/fenn-chat/anywhere-api"
@@ -523,7 +523,7 @@
           "Places"
         ],
         "summary": "Change a place",
-        "description": "Changes a saved place's tags, note, name or rating; or the label (home, work, school) of a visited place. Adding favorite is how a place is loved. The person is told and can undo saved-place edits in the app. Tag edits keep the place's other tags.",
+        "description": "Renames a saved or visited place. A visited pin’s new name applies to every stay there. Use correct_visit to move one stay. Saved places also take tags, notes and ratings. Visited places take home, work or school labels. The person can undo saved-place edits.",
         "parameters": [
           {
             "name": "place_id",
@@ -978,6 +978,183 @@
           },
           "404": {
             "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/visits/{visit_id}": {
+      "patch": {
+        "operationId": "correct_visit",
+        "tags": [
+          "History"
+        ],
+        "summary": "Correct one visit’s venue",
+        "description": "Moves one of your visits to a saved or visited place, or to a venue you specify. Use the visit_id from list_visits. Arrival, departure and other visits stay the same. The person sees the correction in their history.",
+        "parameters": [
+          {
+            "name": "visit_id",
+            "in": "path",
+            "required": true,
+            "description": "The id of one of your visits, from list_visits",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "place_id": {
+                    "description": "Destination pin from list_places, saved or visited. Give either place_id or venue",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  "venue": {
+                    "description": "Destination venue when supplying its location directly. Give either venue or place_id",
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200,
+                        "description": "The venue's name"
+                      },
+                      "lat": {
+                        "type": "number",
+                        "minimum": -90,
+                        "maximum": 90
+                      },
+                      "lng": {
+                        "type": "number",
+                        "minimum": -180,
+                        "maximum": 180
+                      },
+                      "category": {
+                        "description": "Its category, which picks the pin's icon",
+                        "type": "string",
+                        "enum": [
+                          "airport",
+                          "park",
+                          "nationalPark",
+                          "statePark",
+                          "campus",
+                          "resort",
+                          "hotel",
+                          "museum",
+                          "beach",
+                          "stadium",
+                          "university",
+                          "hospital",
+                          "mall",
+                          "themePark",
+                          "amusementPark",
+                          "fairground",
+                          "zoo",
+                          "marina",
+                          "harbor",
+                          "harbour",
+                          "golfCourse",
+                          "skiResort",
+                          "restaurant",
+                          "cafe",
+                          "bakery",
+                          "store",
+                          "foodMarket",
+                          "gasStation",
+                          "pharmacy",
+                          "fitnessCenter",
+                          "library",
+                          "theater",
+                          "movieTheater",
+                          "nightlife",
+                          "brewery",
+                          "winery",
+                          "aquarium",
+                          "campground",
+                          "school",
+                          "conventionCenter",
+                          "carRental",
+                          "publicTransport",
+                          "home",
+                          "work",
+                          "other"
+                        ]
+                      },
+                      "provider_ids": {
+                        "description": "The venue's ids, primary first: one already on the map makes this that place",
+                        "maxItems": 8,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "pattern": "^(apple|google):[^\\n]+$",
+                          "description": "apple:<Apple Maps id> or google:<Google place id>"
+                        }
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "lat",
+                      "lng"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "minProperties": 1,
+                "oneOf": [
+                  {
+                    "required": [
+                      "place_id"
+                    ]
+                  },
+                  {
+                    "required": [
+                      "venue"
+                    ]
+                  }
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Visit"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
           },
           "429": {
             "$ref": "#/components/responses/TooManyRequests"
@@ -2940,6 +3117,26 @@
                       },
                       "required": [
                         "type"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "type": {
+                          "type": "string",
+                          "const": "notice"
+                        },
+                        "notice": {
+                          "type": "string",
+                          "enum": [
+                            "befriended"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "type",
+                        "notice"
                       ],
                       "additionalProperties": false
                     },
@@ -5065,7 +5262,7 @@
         }
       },
       "NotFound": {
-        "description": "No such place on the map (place_not_found), tag (tag_not_found), path (not_found), location (location_not_shared), shared history/calendar (history_not_shared, calendar_not_shared) or accessible conversation (conversation_not_found)",
+        "description": "No such visit (visit_not_found), place on the map (place_not_found), tag (tag_not_found), path (not_found), location (location_not_shared), shared history/calendar (history_not_shared, calendar_not_shared) or accessible conversation (conversation_not_found)",
         "content": {
           "application/json": {
             "schema": {
@@ -5075,7 +5272,7 @@
         }
       },
       "Conflict": {
-        "description": "The change cannot be made: a visited place takes only a label (not_saved), a label needs visits (not_visited), too many tags (too_many_tags), a deleted tag (tag_deleted), a standard tag renamed or removed (standard_tag), or an Idempotency-Key reused for another request (idempotency_conflict)",
+        "description": "The change cannot be made: the edit requires a saved place (not_saved), a label needs visits (not_visited), a visit correction cannot link its destination (place_link_limit) or recount the stays (visit_history_unavailable), too many tags (too_many_tags), a deleted tag (tag_deleted), a standard tag renamed or removed (standard_tag), or an Idempotency-Key reused for another request (idempotency_conflict)",
         "content": {
           "application/json": {
             "schema": {

@@ -23,8 +23,15 @@ The ones for one place take its id, which `list_places` gives:
 `remove_place` and `list_place_visits`. The curl examples for visits, trips
 and history take an optional range: `./curl/list_visits.sh 2026-10-01 2026-10-08`.
 
-`add_place`, `update_place` and `remove_place` change the map for real: the
-person is told, and can undo each change in the app.
+`correct_visit` takes the ID of one of your own visits from `list_visits`
+and the destination ID from `list_places`. Run
+`./curl/correct_visit.sh <visit_id> <destination_place_id>` to change where
+that visit was recorded. The answer gives the corrected visit. The
+[visit correction guide](../README.md#correct-a-visit) also shows how to
+supply a destination that is missing from the map.
+
+The `add_place`, `update_place` and `remove_place` examples change a saved
+place on the map. The person sees each change in the app and can undo it.
 
 The tag examples `create_tag`, `update_tag` and `remove_tag` change the
 person's own tags for real. The last two take the tag id returned by

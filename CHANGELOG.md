@@ -4,6 +4,22 @@ The agent API's changes, newest first. The version is `info.version` in
 [`openapi.json`](openapi.json); paths stay under `/v1` while every change is
 compatible.
 
+## 2.5.0
+
+- Agents can correct one recorded visit with `correct_visit`
+  (`PATCH /visits/{visit_id}`). Give the destination's map ID or the
+  venue's name and coordinates. The visit keeps its ID and times.
+- `update_place` now accepts `name` for a visited pin. The new name
+  appears on all visits at that pin. [Visit correction guide](README.md#correct-a-visit).
+
+## 2.4.0
+
+- **Friends' notices (2026-11-16)**: a message's `content` can be
+  `{"type": "notice", "notice": "befriended"}`, the server's note in two
+  people's conversation that they became friends. It has no text and no
+  author but Anywhere: show it as the app says it ("You and Maya are now
+  friends"), and never reply to it.
+
 ## 2.3.0
 
 - **Chats and shared context (2026-11-06)**: `list_conversations` and

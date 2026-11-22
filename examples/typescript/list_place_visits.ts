@@ -8,5 +8,5 @@ if (!placeId) throw new Error("usage: node list_place_visits.ts <place_id>");
 const { visits } = await call<{ visits: Visit[] }>("GET", placePath(placeId, "visits"), { query: { limit: 20 } });
 for (const visit of visits) {
   const stay = visit.duration_s === null ? "still there" : `${Math.floor(visit.duration_s / 60)} min`;
-  console.log(`${visit.arrival}  ${stay}`);
+  console.log(`${visit.id}  ${visit.arrival}  ${stay}`);
 }

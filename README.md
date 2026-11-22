@@ -22,6 +22,7 @@ work for both. OAuth tokens are restricted to the MCP resource.
 - [Quick start](#quick-start)
 - [Set up your agent](#set-up-your-agent)
 - [Keep important places up to date](#keep-important-places-up-to-date)
+- [Correct a visit](#correct-a-visit)
 - [Tags and ratings](#tags-and-ratings)
 - [Show map results on your phone](#show-map-results-on-your-phone)
 - [Getting a token](#getting-a-token)
@@ -45,6 +46,7 @@ work for both. OAuth tokens are restricted to the MCP resource.
 | Take a place off the map | `DELETE /places/{place_id}` | `remove_place` | [curl](examples/curl/remove_place.sh) · [Python](examples/python/remove_place.py) · [TypeScript](examples/typescript/remove_place.ts) |
 | A place's visits | `GET /places/{place_id}/visits` | `list_visits` with `place_id` | [curl](examples/curl/list_place_visits.sh) · [Python](examples/python/list_place_visits.py) · [TypeScript](examples/typescript/list_place_visits.ts) |
 | Visits: by time, place or area | `GET /visits` | `list_visits` | [curl](examples/curl/list_visits.sh) · [Python](examples/python/list_visits.py) · [TypeScript](examples/typescript/list_visits.ts) |
+| Correct the venue for one visit | `PATCH /visits/{visit_id}` | `correct_visit` | [curl](examples/curl/correct_visit.sh) · [Python](examples/python/correct_visit.py) · [TypeScript](examples/typescript/correct_visit.ts) |
 | Trips | `GET /trips` | `list_trips` | [curl](examples/curl/list_trips.sh) · [Python](examples/python/list_trips.py) · [TypeScript](examples/typescript/list_trips.ts) |
 | Visits and trips as one timeline | `GET /history` | `get_history` | [curl](examples/curl/get_history.sh) · [Python](examples/python/get_history.py) · [TypeScript](examples/typescript/get_history.ts) |
 | Where the person is now | `GET /location` | `get_current_location` | [curl](examples/curl/get_current_location.sh) · [Python](examples/python/get_current_location.py) · [TypeScript](examples/typescript/get_current_location.ts) |
@@ -193,6 +195,32 @@ depend on the agent receiving the information and retaining the instruction.
 If an agent keeps a local copy, use the [incremental sync contract](#pages)
 to refresh it, including removed ids, before relying on it.
 
+## Correct a visit
+
+When Anywhere records a station visit at a nearby shop, find that stay with
+`list_visits`. Use its arrival and departure to pick the right visit. Find
+the station with `list_places`, then pass the two returned IDs to `correct_visit`.
+
+```json
+{"visit_id": "<visit id>", "place_id": "<station place id>"}
+```
+
+If the destination is missing from the map, supply a verified venue in
+place of `place_id`. A venue requires `name`, `lat` and `lng` and accepts
+`category` and known `provider_ids`. For example, these MCP arguments move
+one visit to Tokyo Station.
+
+```json
+{"visit_id": "<visit id>", "venue": {"name": "Tokyo Station", "lat": 35.6812, "lng": 139.7671}}
+```
+
+For REST, send the destination as the JSON body of `PATCH /visits/{visit_id}`.
+The answer contains the corrected visit with its original ID, arrival and
+departure. This changes one visit on the connected person's own map. To
+correct the name for every visit at a visited pin, call `update_place`
+with that pin's `place_id` and the new `name`. Both corrections appear in
+agent activity. To change one again, submit the desired venue or name.
+
 ## Tags and ratings
 
 A saved place has any number of tags. Two are standard, and every person
@@ -228,9 +256,8 @@ go to, adds one of their tags, and rates it:
 
 Use a real id from `GET /tags` in place of that placeholder. `rating: null`
 clears a rating. These saved-place edits are recorded with Undo in the app.
-A visited place must first be saved before it takes a note, rating or tags;
-its home/work/school label can be changed without saving, but a label
-change does not have an Undo action.
+A visited place must first be saved before it takes a note, rating or tags.
+You can change its name and home/work/school label without saving it.
 
 ## Show map results on your phone
 
@@ -309,12 +336,12 @@ opens:
    it in its keychain, and the server keeps only its hash. An offline setup
    becomes usable after its registration syncs.
 
-A token opens the person's whole map: it reads and changes their places, and
-reads their history, current location, mirrored calendar and chats, plus the
-locations, history and calendars friends currently share with them. It can
-also send map-view notifications. Existing personal and OAuth tokens gain
-these read capabilities automatically; no token replacement or reconnection
-is needed. There are no per-capability scopes.
+A token opens the person's whole map. It can read and change their places,
+rename a visited pin and correct the venue for one of their own visits.
+It can read their history, current location, mirrored calendar and chats,
+read the locations, history and calendars friends currently share with them,
+and send map-view notifications. Existing personal and OAuth tokens already
+have these permissions. All capabilities share one scope.
 Keep it out of code, logs, URLs and shared conversations; give it to the
 agent the way the agent keeps secrets (its connector's credential, a secret
 store, an environment variable), or use the app's private setup prompt as
@@ -344,12 +371,14 @@ guides in [mcp/](mcp/README.md) for client-specific setup.
 ## The person is told
 
 Anywhere records every call that reads or changes the person's places,
-tags, history, location, friends, calendars or chats, and tells them: a notification per agent, sent once the
-agent pauses (a minute after its last call, at most three minutes after its
-first), in words like "Grok added Café de Flore to your map" or "ChatGPT
-read your history". The app lists each agent's activity for 90 days, and
-saved-place changes can be undone there. Tag (created, renamed, deleted) and
-home/work/school label changes do not have an Undo action. `GET /me` reads only the person's name and
+tags, history, location, friends, calendars or chats, and tells them: the
+first activity sends a notification immediately, then each agent sends at
+most one notification per minute. Calls during that minute are grouped in
+the next notification when the minute ends; more calls do not extend the
+wait. Notifications use words like "Grok added Café de Flore to your map"
+or "ChatGPT read your history". The app lists each agent's activity for 90 days, and
+saved-place changes can be undone there. Tag changes, home/work/school
+labels, visited-place renames and visit corrections have no Undo action. `GET /me` reads only the person's name and
 time zone, and is not recorded.
 
 So read what the task needs, change the map within the person's request
@@ -363,7 +392,7 @@ Per token:
 | Limit | Value | Beyond it |
 |---|---|---|
 | Calls | 1,000 a day (UTC) and 60 a minute | `429 quota_exceeded`, with `Retry-After` in seconds |
-| Place/tag changes and map-view notifications | 200 a day (UTC), shared allowance | `429 quota_exceeded` |
+| Place, visit and tag changes and map-view notifications | 200 a day (UTC), shared allowance | `429 quota_exceeded` |
 | Body | 32 KiB | `413 payload_too_large` |
 | Page | 200 items (50 by default) | `400 invalid_request` |
 
@@ -389,6 +418,7 @@ agents:
 | 400 | `invalid_json` | The body is not a JSON object |
 | 401 | `invalid_token` | No token, a malformed or unknown one, or a revoked one |
 | 404 | `place_not_found` | No such place on the map |
+| 404 | `visit_not_found` | No such visit in the connected person's history |
 | 404 | `tag_not_found` | No such tag: neither a standard one nor one of the person's |
 | 404 | `location_not_shared` | No location is available under the current sharing permission |
 | 404 | `history_not_shared` | This person does not currently share history with you |
@@ -396,8 +426,10 @@ agents:
 | 404 | `conversation_not_found` | No such conversation with your current membership |
 | 404 | `not_found` | No such path |
 | 405 | `method_not_allowed` | The path takes other methods (`Allow` names them) |
-| 409 | `not_saved` | A `visited` place takes a label and nothing else: save it first (`POST /places`) for other edits; only the person hides it |
+| 409 | `not_saved` | A `visited` place takes a name and label. Save it first (`POST /places`) to edit its note, rating or tags. Only the person hides it. |
 | 409 | `not_visited` | Only a place the person has been to takes a label |
+| 409 | `visit_history_unavailable` | The existing stays at the source or destination could not be read to update visit totals |
+| 409 | `place_link_limit` | The destination saved place has reached its limit of linked visited places |
 | 409 | `idempotency_conflict` | An `Idempotency-Key` used for another request |
 | 409 | `too_many_tags` | The change would give a place more than 50 tags |
 | 409 | `tag_deleted` | The tag created for this request was since deleted; use a new key for a new tag |

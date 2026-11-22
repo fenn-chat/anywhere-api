@@ -8,4 +8,4 @@ from anywhere import pages, place_name
 week_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat(timespec="seconds")
 for visit in pages("/visits", "visits", {"from": week_ago}):
     stay = f"{visit['duration_s'] // 60} min" if visit["duration_s"] is not None else "still there"
-    print(f"{visit['arrival']}  {place_name(visit['place'])}  {stay}")
+    print(f"{visit['id']}  {visit['arrival']}  {place_name(visit['place'])}  {stay}")

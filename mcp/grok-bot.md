@@ -55,6 +55,13 @@ existing API's reads and writes; there is no separate read-only scope.
 
 > Append “Go before sunset” to that place's note, keeping the existing text.
 
+> Yesterday's 8 a.m. visit shows the shop next to the station.
+> Move that visit to the station I already have on my map.
+
+The Bot can find that stay with `list_visits` and move it with
+`correct_visit`. To rename a visited pin across all its visits, ask the
+Bot to rename the place. [How visit corrections work](../README.md#correct-a-visit).
+
 Use only places the Bot can identify reliably. Anywhere does not geocode
 addresses: unknown coordinates need a reliable lookup or clarification.
 The [tool reference](README.md#tools) describes all actions. A successful

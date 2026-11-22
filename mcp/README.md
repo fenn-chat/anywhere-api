@@ -25,6 +25,7 @@ Guides: [ChatGPT](chatgpt.md) · [Claude](claude.md) · [Muse](muse.md) ·
 | `update_place` | Changes a place's tags, note, name, label or rating | changes the map, destructive |
 | `remove_place` | Takes a saved place off the map | changes the map, destructive |
 | `list_visits` | Visits: in a range, to a place, or in a box | read-only |
+| `correct_visit` | Moves one of your visits to the correct venue or a place on your map | changes visit history, destructive |
 | `list_trips` | Trips: when, from where to where, how, how far | read-only |
 | `get_history` | Visits and trips as one timeline | read-only |
 | `get_current_location` | Own or shared current location; optional `person_id` | read-only |
@@ -45,7 +46,7 @@ argument `place_id`, the `Idempotency-Key` header the argument
 result marked `isError`, whose text is the API's error,
 `{ "error": { "code", "message" } }`. The person is told of every call that
 reads or changes their data, and can undo saved-place changes in the app.
-Tag (created, renamed, deleted) and label changes have no Undo action. Change the map within
+Tag changes, labels, visited-place renames and visit corrections have no Undo action. Change the map within
 their request, including a standing
 request to keep their important places current. See
 [the agent setup and maintenance workflow](../README.md#set-up-your-agent)
@@ -53,9 +54,11 @@ for seeding home, work and other known places, and
 [showing results on the phone](../README.md#show-map-results-on-your-phone)
 for what the current API can display.
 
-Location, visits, trips and history tools also accept `person_id`. Shared
+Location, visit, trip and history reads also accept `person_id`. Shared
 data follows current sharing levels and blocks; chats require current
-membership. Existing tokens have these reads automatically.
+membership. Existing tokens have these reads automatically. See
+[Correct a visit](../README.md#correct-a-visit) for both ways to identify
+the venue when correcting your own history.
 
 ## Check the connection
 
