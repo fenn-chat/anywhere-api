@@ -4,6 +4,16 @@ The agent API's changes, newest first. The version is `info.version` in
 [`openapi.json`](openapi.json); paths stay under `/v1` while every change is
 compatible.
 
+## 2.5.1
+
+- **Limits (2026-11-23)**: a token makes 500 changes to the map a day (UTC),
+  up from 200.
+- A `429 quota_exceeded` says in its `message` which limit is reached, how
+  much of it is used, when it resets (an ISO 8601 UTC time) and in how many
+  seconds, so an agent that only reads the body (over MCP) can tell the
+  person when to continue. The status, the code and `Retry-After` are
+  unchanged. [Limits](README.md#limits).
+
 ## 2.5.0
 
 - Agents can correct one recorded visit with `correct_visit`

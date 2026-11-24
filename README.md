@@ -392,14 +392,19 @@ Per token:
 | Limit | Value | Beyond it |
 |---|---|---|
 | Calls | 1,000 a day (UTC) and 60 a minute | `429 quota_exceeded`, with `Retry-After` in seconds |
-| Place, visit and tag changes and map-view notifications | 200 a day (UTC), shared allowance | `429 quota_exceeded` |
+| Place, visit and tag changes and map-view notifications | 500 a day (UTC), shared allowance | `429 quota_exceeded` |
 | Body | 32 KiB | `413 payload_too_large` |
 | Page | 200 items (50 by default) | `400 invalid_request` |
 
 Each call counts once, and a change also counts against the changes. A call
 refused for its input (`400`) and a retry answered from its `Idempotency-Key`
 are not counted; a call that failed on Anywhere's side (`5xx`) is given back.
-`GET /me` says what the token used today. An address that presents 50 unknown
+`GET /me` says what the token used today. A change counts whether or not it
+altered the map: adding a place the map already holds counts too, so list the
+map first and skip what is there. A `429 quota_exceeded` says in its `message`
+which limit is reached, when it resets (UTC) and in how long; what was changed
+stays saved, and after a day's changes are spent the reads still work. An
+address that presents 50 unknown
 tokens in a day is refused (`429 too_many_attempts`) until midnight UTC.
 
 ## Errors
