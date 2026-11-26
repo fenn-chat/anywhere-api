@@ -64,6 +64,9 @@ REST scripts continue to use a separate personal access key.
 ## Use and disconnect
 
 Ask Muse to find saved places, save a place you identify, or update a note.
+You can also give it a trail’s coordinates and ask it to draw the trail
+until your hike ends. Open its private link to see the line in Anywhere.
+[Temporary map lines](../README.md#draw-a-temporary-map-line).
 The [tool reference](README.md#tools) describes every supported action.
 The connection covers the API's existing read and write permissions;
 Anywhere does not currently offer a separate read-only OAuth scope.

@@ -33,14 +33,17 @@ supply a destination that is missing from the map.
 The `add_place`, `update_place` and `remove_place` examples change a saved
 place on the map. The person sees each change in the app and can undo it.
 
+The polyline examples draw a waterfront walk, list active lines, read one line, rename it, and remove it. Pass the returned ID to `get_polyline`, `update_polyline`, and `remove_polyline`. Set `ANYWHERE_IDEMPOTENCY_KEY` to a UUID and reuse it when retrying the same creation.
+
 The tag examples `create_tag`, `update_tag` and `remove_tag` change the
 person's own tags for real. The last two take the tag id returned by
 `create_tag` or `list_tags` (the standard tags `favorite` and `wantToGo` are
 neither renamed nor removed). Tag changes have no Undo action; deleting a
 tag keeps its places.
 
-`open_map` sends a notification for real, opening the requested camera view
-when the person taps it. It does not save places. `sent` means the push
+The `open_map` examples use a camera. To show a line instead, send its
+`polyline_id` as the only map target. A tap opens that line and its details.
+[Map view examples](../README.md#show-map-results-on-your-phone). `sent` means the push
 service accepted at least one notification; `unavailable` means no usable
 push target was found. Neither confirms that the app opened.
 

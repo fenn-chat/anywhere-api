@@ -10,6 +10,10 @@ published plugin. Its connection link is
 [Connect Anywhere](https://chatgpt.com/#settings/Connectors?connector=asdk_app_6ae13ce037f08191832b9b348aa49c42).
 After sign-in, call `list_places` to verify access before reporting success.
 
+With a route file or a list of coordinates in the chat, try “Draw this
+walk on my map until tomorrow evening and give me its link.” The link
+opens the line on your iPhone. [Temporary map lines](../README.md#draw-a-temporary-map-line).
+
 For integrations you configure yourself, personal access keys remain usable:
 
 - **A GPT with an action**, in ChatGPT on the web, desktop and phone: the GPT

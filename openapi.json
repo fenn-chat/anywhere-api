@@ -2,8 +2,8 @@
   "openapi": "3.1.0",
   "info": {
     "title": "Anywhere agent API",
-    "version": "2.5.1",
-    "description": "Read and change a person's Anywhere map: the places they saved and the ones they go to, their visits and trips (all of their history), and where they are now.\n\n**Authentication.** Every call carries the person's personal token, made in the Anywhere app: `Authorization: Bearer anyw_pat_…`. The same token connects an MCP client to `https://anywhere.fenn.chat/mcp` (Streamable HTTP), whose tools are these operations under the same names.\n\n**Existing connections.** Personal and OAuth tokens include chat reads and shared context automatically. Other people’s location, history and calendars require their current sharing levels; chats require current membership.\n\n**The person is told.** Reads of places, tags, history, location, friends' shared location, history and calendar, and chats are recorded and shown in the app, as are edits. Saved-place edits, their tags included, can be undone; visit corrections, visited-place edits and changes to the tags themselves (created, renamed, removed) cannot. A map-view request sends its own immediate notification and saves no places.\n\n**Limits,** per token: 1000 calls a day (UTC) and 60 a minute, 500 changes to the map a day; 429 with Retry-After beyond them, its message saying which limit, when it resets (UTC) and in how long.\n\n**Conventions.** Times are ISO 8601 in UTC, to the millisecond; coordinates WGS84 degrees. Lists come in pages of up to 200 items: pass `next_cursor` as `cursor` for the next, with the same filters. GET answers carry an ETag (If-None-Match gives 304 while it holds); `updated_since` lists what changed since a time. Errors are `{ \"error\": { \"code\", \"message\" } }`. Adding a place takes an Idempotency-Key.",
+    "version": "2.6.0",
+    "description": "Read and change a person's Anywhere map: the places they saved and the ones they go to, their visits and trips (all of their history), and where they are now.\n\n**Authentication.** Every call carries the person's personal token, made in the Anywhere app: `Authorization: Bearer anyw_pat_…`. The same token connects an MCP client to `https://anywhere.fenn.chat/mcp` (Streamable HTTP), whose tools are these operations under the same names.\n\n**Existing connections.** Personal and OAuth tokens can draw, read, update and remove temporary lines on the connected person's map. They also include chat reads and shared context. Other people’s location, history and calendars require their current sharing levels; chats require current membership.\n\n**The person is told.** Reads of places, lines, tags, history, location, friends' shared location, history and calendar, and chats are recorded and shown in the app, as are edits. A new line qualifies for a grouped notification. Other line operations appear only in Activity. Saved-place edits, their tags included, can be undone; visit corrections, visited-place edits and changes to the tags themselves (created, renamed, removed) cannot. A map-view request sends its own immediate notification.\n\n**Limits,** per token: 1000 calls a day (UTC) and 60 a minute, 500 changes to the map a day; 429 with Retry-After beyond them, its message saying which limit, when it resets (UTC) and in how long.\n\n**Conventions.** Times are ISO 8601 in UTC, to the millisecond; coordinates WGS84 degrees. Lists come in pages of up to 200 items: pass `next_cursor` as `cursor` for the next, with the same filters. GET answers carry an ETag (If-None-Match gives 304 while it holds); `updated_since` lists what changed since a time. Errors are `{ \"error\": { \"code\", \"message\" } }`. Reuse an Idempotency-Key to retry a place or line creation.",
     "contact": {
       "name": "Anywhere agent API",
       "url": "https://github.com/fenn-chat/anywhere-api"
@@ -46,7 +46,7 @@
     },
     {
       "name": "Map",
-      "description": "Send a notification opening a camera view on the person's phone"
+      "description": "Temporary lines on the map and notifications opening a map view on the person's phone"
     },
     {
       "name": "Friends",
@@ -66,6 +66,462 @@
     }
   ],
   "paths": {
+    "/polylines": {
+      "get": {
+        "operationId": "list_polylines",
+        "tags": [
+          "Map"
+        ],
+        "summary": "List active map lines",
+        "description": "Lists active lines on the person's map, latest change first, with lengths and links. Use get_polyline for the vertices.",
+        "parameters": [
+          {
+            "name": "limit",
+            "in": "query",
+            "required": false,
+            "description": "Items per page, at most 200",
+            "schema": {
+              "default": 50,
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 200
+            }
+          },
+          {
+            "name": "cursor",
+            "in": "query",
+            "required": false,
+            "description": "The `next_cursor` of the previous page, with the same filters",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 2000
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolylinePage"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "post": {
+        "operationId": "add_polyline",
+        "tags": [
+          "Map"
+        ],
+        "summary": "Add a line to the map",
+        "description": "Draws an expiring private line along the supplied points, optionally linked to places. Return its url to the person. Retry with the same idempotency key.",
+        "parameters": [
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": false,
+            "description": "A key of your own for this request (a UUID): a retry with the same key and the same input answers the first response again, without a second change",
+            "schema": {
+              "type": "string",
+              "pattern": "^[\\x21-\\x7E]{1,255}$"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "A name of 1 to 100 UTF-16 code units"
+                  },
+                  "points": {
+                    "minItems": 2,
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "lat": {
+                          "type": "number",
+                          "minimum": -90,
+                          "maximum": 90
+                        },
+                        "lng": {
+                          "type": "number",
+                          "minimum": -180,
+                          "maximum": 180
+                        }
+                      },
+                      "required": [
+                        "lat",
+                        "lng"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Ordered WGS84 coordinates along the actual path, 2 to 500 vertices. Adjacent points must be distinct. Repeat the first point at the end to close a loop"
+                  },
+                  "color": {
+                    "description": "Line color. Defaults to blue on creation",
+                    "type": "string",
+                    "enum": [
+                      "blue",
+                      "teal",
+                      "green",
+                      "orange",
+                      "red",
+                      "purple"
+                    ]
+                  },
+                  "description": {
+                    "description": "Plain-text details, up to 2000 UTF-16 code units",
+                    "type": "string",
+                    "maxLength": 2000
+                  },
+                  "place_ids": {
+                    "description": "Distinct saved or visited place ids from this account, in display order. An empty array clears all links",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "expires_at": {
+                    "description": "Future date-time with offset, no more than 30 days ahead; defaults to 24 hours after creation",
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "required": [
+                  "name",
+                  "points"
+                ],
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Created (Location names it)",
+            "headers": {
+              "Location": {
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolylineWriteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
+    "/polylines/{polyline_id}": {
+      "get": {
+        "operationId": "get_polyline",
+        "tags": [
+          "Map"
+        ],
+        "summary": "Read a map line",
+        "description": "Reads one of the person's active lines with its points, linked places and expiry.",
+        "parameters": [
+          {
+            "name": "polyline_id",
+            "in": "path",
+            "required": true,
+            "description": "A polyline id from list_polylines or add_polyline",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "headers": {
+              "ETag": {
+                "description": "The answer's version: send it as If-None-Match to get 304 while it holds",
+                "schema": {
+                  "type": "string"
+                }
+              }
+            },
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Polyline"
+                }
+              }
+            }
+          },
+          "304": {
+            "description": "Not modified: the If-None-Match ETag still holds"
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "patch": {
+        "operationId": "update_polyline",
+        "tags": [
+          "Map"
+        ],
+        "summary": "Change a map line",
+        "description": "Changes the supplied fields of an active line. Points and linked place ids replace their entire lists. Omit expires_at to keep the original deadline.",
+        "parameters": [
+          {
+            "name": "polyline_id",
+            "in": "path",
+            "required": true,
+            "description": "A polyline id from list_polylines or add_polyline",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "name": {
+                    "type": "string",
+                    "description": "A name of 1 to 100 UTF-16 code units"
+                  },
+                  "points": {
+                    "minItems": 2,
+                    "maxItems": 500,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "lat": {
+                          "type": "number",
+                          "minimum": -90,
+                          "maximum": 90
+                        },
+                        "lng": {
+                          "type": "number",
+                          "minimum": -180,
+                          "maximum": 180
+                        }
+                      },
+                      "required": [
+                        "lat",
+                        "lng"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "description": "Ordered WGS84 coordinates along the actual path, 2 to 500 vertices. Adjacent points must be distinct. Repeat the first point at the end to close a loop"
+                  },
+                  "color": {
+                    "description": "Line color. Defaults to blue on creation",
+                    "type": "string",
+                    "enum": [
+                      "blue",
+                      "teal",
+                      "green",
+                      "orange",
+                      "red",
+                      "purple"
+                    ]
+                  },
+                  "description": {
+                    "description": "Replace the plain-text details, up to 2000 UTF-16 code units, or pass null to clear them",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "maxLength": 2000
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "place_ids": {
+                    "description": "Distinct saved or visited place ids from this account, in display order. An empty array clears all links",
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "expires_at": {
+                    "description": "Future date-time with offset, no more than 30 days ahead; defaults to 24 hours after creation",
+                    "type": "string",
+                    "format": "date-time"
+                  }
+                },
+                "minProperties": 1,
+                "additionalProperties": false
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolylineWriteResult"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "413": {
+            "$ref": "#/components/responses/PayloadTooLarge"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      },
+      "delete": {
+        "operationId": "remove_polyline",
+        "tags": [
+          "Map"
+        ],
+        "summary": "Remove a map line",
+        "description": "Deletes the specified active line from the person's map and keeps all linked places.",
+        "parameters": [
+          {
+            "name": "polyline_id",
+            "in": "path",
+            "required": true,
+            "description": "A polyline id from list_polylines or add_polyline",
+            "schema": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "OK",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/PolylineRemoval"
+                }
+              }
+            }
+          },
+          "400": {
+            "$ref": "#/components/responses/BadRequest"
+          },
+          "401": {
+            "$ref": "#/components/responses/Unauthorized"
+          },
+          "404": {
+            "$ref": "#/components/responses/NotFound"
+          },
+          "409": {
+            "$ref": "#/components/responses/Conflict"
+          },
+          "429": {
+            "$ref": "#/components/responses/TooManyRequests"
+          },
+          "503": {
+            "$ref": "#/components/responses/Unavailable"
+          }
+        }
+      }
+    },
     "/me": {
       "get": {
         "operationId": "get_me",
@@ -1473,7 +1929,7 @@
           "Map"
         ],
         "summary": "Show a map on the person's phone",
-        "description": "Sends a notification that opens Anywhere at the requested camera, or on a place of the person's map with its panel (place_id), when tapped. Saves no places and never launches the app remotely. sent means APNs accepted a push, not that it was seen. Retry with an idempotency key.",
+        "description": "Sends a notification that opens Anywhere at the requested camera, or on a place or line with its panel (place_id or polyline_id), when tapped. Saves no places and never launches the app remotely. sent means APNs accepted a push, not that it was seen. Retry with an idempotency key.",
         "parameters": [
           {
             "name": "Idempotency-Key",
@@ -1493,6 +1949,12 @@
               "schema": {
                 "type": "object",
                 "properties": {
+                  "polyline_id": {
+                    "description": "Show this line and its details. Supply this target on its own, without camera or place_id",
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
                   "camera": {
                     "description": "Where the map looks; with place_id, the place from 1 km overhead by default",
                     "type": "object",
@@ -1538,7 +2000,7 @@
                     "additionalProperties": false
                   },
                   "place_id": {
-                    "description": "A place on the person's map, from list_places: the tap opens its panel on the map, as when the person taps its pin. Give camera, place_id or both",
+                    "description": "A place from list_places. Tapping the notification focuses its pin and opens its panel. Supply a camera to choose how the place is framed",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 200
@@ -1550,7 +2012,7 @@
                     "maxLength": 100
                   },
                   "message": {
-                    "description": "What this map view shows; defaults to Open this view in Anywhere, or Open <place> in Anywhere",
+                    "description": "Notification text. Defaults to Open <name> in Anywhere for a named place or line, or Open this view in Anywhere for a camera",
                     "type": "string",
                     "minLength": 1,
                     "maxLength": 500
@@ -4761,6 +5223,236 @@
         ],
         "additionalProperties": false
       },
+      "Polyline": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string"
+          },
+          "url": {
+            "type": "string",
+            "format": "uri"
+          },
+          "name": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "color": {
+            "type": "string",
+            "enum": [
+              "blue",
+              "teal",
+              "green",
+              "orange",
+              "red",
+              "purple"
+            ]
+          },
+          "place_ids": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "created_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "updated_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "creator_name": {
+            "type": "string"
+          },
+          "length_m": {
+            "type": "number",
+            "minimum": 0
+          },
+          "point_count": {
+            "type": "integer",
+            "minimum": 2,
+            "maximum": 500
+          },
+          "points": {
+            "minItems": 2,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "lat": {
+                  "type": "number",
+                  "minimum": -90,
+                  "maximum": 90
+                },
+                "lng": {
+                  "type": "number",
+                  "minimum": -180,
+                  "maximum": 180
+                }
+              },
+              "required": [
+                "lat",
+                "lng"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "id",
+          "url",
+          "name",
+          "color",
+          "place_ids",
+          "created_at",
+          "updated_at",
+          "expires_at",
+          "creator_name",
+          "length_m",
+          "point_count",
+          "points"
+        ],
+        "additionalProperties": false
+      },
+      "PolylinePage": {
+        "type": "object",
+        "properties": {
+          "polylines": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "url": {
+                  "type": "string",
+                  "format": "uri"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": "string",
+                  "enum": [
+                    "blue",
+                    "teal",
+                    "green",
+                    "orange",
+                    "red",
+                    "purple"
+                  ]
+                },
+                "place_ids": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "created_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "updated_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "expires_at": {
+                  "type": "string",
+                  "format": "date-time"
+                },
+                "creator_name": {
+                  "type": "string"
+                },
+                "length_m": {
+                  "type": "number",
+                  "minimum": 0
+                },
+                "point_count": {
+                  "type": "integer",
+                  "minimum": 2,
+                  "maximum": 500
+                }
+              },
+              "required": [
+                "id",
+                "url",
+                "name",
+                "color",
+                "place_ids",
+                "created_at",
+                "updated_at",
+                "expires_at",
+                "creator_name",
+                "length_m",
+                "point_count"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "next_cursor": {
+            "description": "Pass it as `cursor` for the next page; null on the last page",
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "polylines",
+          "next_cursor"
+        ],
+        "additionalProperties": false
+      },
+      "PolylineWriteResult": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "enum": [
+              "created",
+              "updated",
+              "unchanged"
+            ]
+          },
+          "polyline": {
+            "$ref": "#/components/schemas/Polyline"
+          }
+        },
+        "required": [
+          "outcome",
+          "polyline"
+        ],
+        "additionalProperties": false
+      },
+      "PolylineRemoval": {
+        "type": "object",
+        "properties": {
+          "outcome": {
+            "type": "string",
+            "const": "removed"
+          },
+          "id": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "outcome",
+          "id"
+        ],
+        "additionalProperties": false
+      },
       "MapCamera": {
         "type": "object",
         "properties": {
@@ -4819,6 +5511,10 @@
           },
           "camera": {
             "$ref": "#/components/schemas/MapCamera"
+          },
+          "polyline_id": {
+            "description": "The active line whose details open on the map",
+            "type": "string"
           },
           "place_id": {
             "description": "The place whose panel the notification opens, when one was asked for",
@@ -5262,7 +5958,7 @@
         }
       },
       "NotFound": {
-        "description": "No such visit (visit_not_found), place on the map (place_not_found), tag (tag_not_found), path (not_found), location (location_not_shared), shared history/calendar (history_not_shared, calendar_not_shared) or accessible conversation (conversation_not_found)",
+        "description": "No such visit (visit_not_found), place on the map (place_not_found), active line (polyline_not_found), tag (tag_not_found), path (not_found), location (location_not_shared), shared history/calendar (history_not_shared, calendar_not_shared) or accessible conversation (conversation_not_found)",
         "content": {
           "application/json": {
             "schema": {

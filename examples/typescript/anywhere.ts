@@ -87,6 +87,27 @@ export interface Me {
   usage: { calls_today: number; map_changes_today: number };
 }
 
+export interface PolylineSummary {
+  id: string;
+  url: string;
+  name: string;
+  description?: string;
+  color: "blue" | "teal" | "green" | "orange" | "red" | "purple";
+  place_ids: string[];
+  created_at: string;
+  updated_at: string;
+  expires_at: string;
+  creator_name: string;
+  length_m: number;
+  point_count: number;
+}
+export interface Polyline extends PolylineSummary {
+  points: { lat: number; lng: number }[];
+}
+export type PolylinePage = { polylines: PolylineSummary[]; next_cursor: string | null };
+export type PolylineWriteResult = { outcome: "created" | "updated" | "unchanged"; polyline: Polyline };
+export type PolylineRemoval = { outcome: "removed"; id: string };
+
 export interface Place {
   id: string;
   /** Opens the place in Anywhere on the person's iPhone. */
@@ -136,6 +157,8 @@ export interface MapOpenResult {
   outcome: "sent" | "unavailable";
   camera: { lat: number; lng: number; distance_m: number; heading: number; pitch: number };
   notifications_sent: number;
+  place_id?: string;
+  polyline_id?: string;
 }
 
 export interface Friend {

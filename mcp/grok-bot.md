@@ -55,6 +55,10 @@ existing API's reads and writes; there is no separate read-only scope.
 
 > Append “Go before sunset” to that place's note, keeping the existing text.
 
+> Draw a temporary line through these coordinates in order and send me its link.
+
+The line expires after 24 hours by default. [Temporary map lines](../README.md#draw-a-temporary-map-line).
+
 > Yesterday's 8 a.m. visit shows the shop next to the station.
 > Move that visit to the station I already have on my map.
 

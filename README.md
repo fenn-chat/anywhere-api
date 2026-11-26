@@ -3,9 +3,9 @@
 Let an agent read and change your [Anywhere](https://anywhere.fenn.chat) map:
 the places you saved and the ones you go to, every visit and trip you made,
 where you are now, your chats and calendar, and the locations, history and
-calendars your friends share with you. Agents
-can also send a notification that opens a particular map view, or one of
-your places, on your phone.
+calendars your friends share with you. An agent can draw a named, temporary
+line on your map and link places along it. A notification can open a line,
+a place, or a particular map view on your phone.
 
 | | |
 |---|---|
@@ -24,6 +24,7 @@ work for both. OAuth tokens are restricted to the MCP resource.
 - [Keep important places up to date](#keep-important-places-up-to-date)
 - [Correct a visit](#correct-a-visit)
 - [Tags and ratings](#tags-and-ratings)
+- [Draw a temporary map line](#draw-a-temporary-map-line)
 - [Show map results on your phone](#show-map-results-on-your-phone)
 - [Getting a token](#getting-a-token)
 - [The person is told](#the-person-is-told)
@@ -50,7 +51,12 @@ work for both. OAuth tokens are restricted to the MCP resource.
 | Trips | `GET /trips` | `list_trips` | [curl](examples/curl/list_trips.sh) · [Python](examples/python/list_trips.py) · [TypeScript](examples/typescript/list_trips.ts) |
 | Visits and trips as one timeline | `GET /history` | `get_history` | [curl](examples/curl/get_history.sh) · [Python](examples/python/get_history.py) · [TypeScript](examples/typescript/get_history.ts) |
 | Where the person is now | `GET /location` | `get_current_location` | [curl](examples/curl/get_current_location.sh) · [Python](examples/python/get_current_location.py) · [TypeScript](examples/typescript/get_current_location.ts) |
-| Send a notification that opens a map view or a place on the phone | `POST /map/open` | `open_map` | [curl](examples/curl/open_map.sh) · [Python](examples/python/open_map.py) · [TypeScript](examples/typescript/open_map.ts) |
+| Send a notification that opens an area, place or line on the phone | `POST /map/open` | `open_map` | [curl](examples/curl/open_map.sh) · [Python](examples/python/open_map.py) · [TypeScript](examples/typescript/open_map.ts) |
+| Draw a temporary waterfront walk | `POST /polylines` | `add_polyline` | [curl](examples/curl/add_polyline.sh) · [Python](examples/python/add_polyline.py) · [TypeScript](examples/typescript/add_polyline.ts) |
+| Read one active line with its points | `GET /polylines/{polyline_id}` | `get_polyline` | [curl](examples/curl/get_polyline.sh) · [Python](examples/python/get_polyline.py) · [TypeScript](examples/typescript/get_polyline.ts) |
+| List active lines, newest change first | `GET /polylines` | `list_polylines` | [curl](examples/curl/list_polylines.sh) · [Python](examples/python/list_polylines.py) · [TypeScript](examples/typescript/list_polylines.ts) |
+| Rename a line and preserve its expiry | `PATCH /polylines/{polyline_id}` | `update_polyline` | [curl](examples/curl/update_polyline.sh) · [Python](examples/python/update_polyline.py) · [TypeScript](examples/typescript/update_polyline.ts) |
+| Delete a line and keep its linked places | `DELETE /polylines/{polyline_id}` | `remove_polyline` | [curl](examples/curl/remove_polyline.sh) · [Python](examples/python/remove_polyline.py) · [TypeScript](examples/typescript/remove_polyline.ts) |
 | Friends, their sharing levels and available shared locations | `GET /friends` | `list_friends` | [curl](examples/curl/list_friends.sh) · [Python](examples/python/list_friends.py) · [TypeScript](examples/typescript/list_friends.ts) |
 | Own or shared calendar events; optional `person_id` | `GET /calendar/events` | `list_calendar_events` | [curl](examples/curl/list_calendar_events.sh) · [Python](examples/python/list_calendar_events.py) · [TypeScript](examples/typescript/list_calendar_events.ts) |
 | Your conversations, optionally with one person | `GET /conversations` | `list_conversations` | [curl](examples/curl/list_conversations.sh) · [Python](examples/python/list_conversations.py) · [TypeScript](examples/typescript/list_conversations.ts) |
@@ -70,6 +76,9 @@ What each takes and answers, field by field, is in [`openapi.json`](openapi.json
   to without having saved it: home, work, a café they stayed at. Each place
   carries its label (`home`, `work`, `school`), the person's private note,
   who put it there, and its visit stats over all of the person's history.
+- **Polylines** are private paths connecting the coordinates an agent supplies,
+  in order. Each line has a name, an expiration time and an app link. Open it
+  to focus the stroke and see its details and any linked places.
 - **History** is every visit and trip ever recorded, however old: no limit.
   A trip is its summary (when, from where to where, how, how far), never its
   route.
@@ -259,6 +268,22 @@ clears a rating. These saved-place edits are recorded with Undo in the app.
 A visited place must first be saved before it takes a note, rating or tags.
 You can change its name and home/work/school label without saving it.
 
+## Draw a temporary map line
+
+Use `add_polyline` to draw a named line on the connected person’s map. Supply 2–500 ordered WGS84 points with `lat` and `lng`. Use the verified path of a route, trail, or event. Adjacent points must be geographically distinct. Repeating the first point at the end closes a loop. Give the person the returned `url` to open the line and its details in Anywhere.
+
+```json
+{"name":"Waterfront walk","points":[{"lat":37.7955,"lng":-122.3937},{"lat":37.7973,"lng":-122.3951}],"color":"teal"}
+```
+
+The default expiry is 24 hours. Supply `expires_at` with a time zone for a different future deadline up to 30 days away. The name takes 1–100 UTF-16 code units and the optional plain-text `description` up to 2,000. Each ID in `place_ids` must identify a distinct saved or visited place on this account. Their order is the display order. The default `color` is `blue`. The other choices are `teal`, `green`, `orange`, `red`, and `purple`.
+
+Tapping the line focuses it and shows its details and linked places. **Show whole line** frames the path. **Recenter map** also includes the usual nearby map items. Removing the line or letting it expire keeps the linked places on the map.
+
+Creation is eligible for the usual grouped activity notification. A notification about one new line opens its detail card. A group covering several lines or a mix of actions opens Activity. Reads, edits, renewals and removals appear in Activity quietly. The line is private to this account. Its URL stays the same across renames and geometry changes. Use the same `idempotency_key` (REST `Idempotency-Key`) to retry a creation.
+
+Use `list_polylines` for summaries and `get_polyline` for the vertices. `update_polyline` preserves omitted fields. Supplying `points` or `place_ids` replaces that entire list. To clear links, pass `place_ids: []`. To clear the description, pass `description: null`. An expired, deleted, or inaccessible ID returns `404 polyline_not_found`.
+
 ## Show map results on your phone
 
 When a map would help the person find a place, compare nearby options or
@@ -321,8 +346,14 @@ curl -sS --fail-with-body https://anywhere.fenn.chat/api/v1/map/open \
 Without a camera, the view looks at the place from 1 km overhead, and the
 message defaults to "Open <the place's name> in Anywhere". The answer
 echoes `place_id`. A place the map does not have is `404 place_not_found`,
-and a request with neither `camera` nor `place_id` is `400 invalid_request`.
+and a request with no map target is `400 invalid_request`.
 A version of Anywhere from before place views opens the camera instead.
+
+To show a line again, use the active line’s `polyline_id` as the only map target. You can also supply notification copy and the request’s idempotency key. A tap frames the whole line and opens its detail card.
+
+```json
+{"polyline_id":"<id returned by add_polyline>","message":"Tap to see the waterfront walk"}
+```
 
 ## Getting a token
 
@@ -370,14 +401,18 @@ guides in [mcp/](mcp/README.md) for client-specific setup.
 
 ## The person is told
 
-Anywhere records every call that reads or changes the person's places,
-tags, history, location, friends, calendars or chats, and tells them: the
-first activity sends a notification immediately, then each agent sends at
-most one notification per minute. Calls during that minute are grouped in
-the next notification when the minute ends; more calls do not extend the
-wait. Notifications use words like "Grok added Café de Flore to your map"
-or "ChatGPT read your history". The app lists each agent's activity for 90 days, and
-saved-place changes can be undone there. Tag changes, home/work/school
+The app lists calls that read or change the person's places, lines, tags, history,
+location, friends, calendars or chats in agent activity for 90 days. Reads of
+the person's own current location, visits, trips and timeline appear only in
+activity. A visit correction sends a notification when it changes the visit.
+Of the line operations, only creating a line qualifies for an automatic notification.
+
+Activity notifications cover other reads and edits, such as "ChatGPT read
+your places" or "Grok added Café de Flore to your map". The first call that
+sends a notification does so immediately. Each agent groups subsequent
+calls that qualify into at most one notification per minute.
+
+The person can undo saved-place changes in activity. Tag changes, home/work/school
 labels, visited-place renames and visit corrections have no Undo action. `GET /me` reads only the person's name and
 time zone, and is not recorded.
 
@@ -392,7 +427,7 @@ Per token:
 | Limit | Value | Beyond it |
 |---|---|---|
 | Calls | 1,000 a day (UTC) and 60 a minute | `429 quota_exceeded`, with `Retry-After` in seconds |
-| Place, visit and tag changes and map-view notifications | 500 a day (UTC), shared allowance | `429 quota_exceeded` |
+| Place, visit, tag and line changes and map-view notifications | 500 a day (UTC), shared allowance | `429 quota_exceeded` |
 | Body | 32 KiB | `413 payload_too_large` |
 | Page | 200 items (50 by default) | `400 invalid_request` |
 
@@ -423,6 +458,7 @@ agents:
 | 400 | `invalid_json` | The body is not a JSON object |
 | 401 | `invalid_token` | No token, a malformed or unknown one, or a revoked one |
 | 404 | `place_not_found` | No such place on the map |
+| 404 | `polyline_not_found` | This account has no active line with that ID. Expired and deleted lines return the same error. |
 | 404 | `visit_not_found` | No such visit in the connected person's history |
 | 404 | `tag_not_found` | No such tag: neither a standard one nor one of the person's |
 | 404 | `location_not_shared` | No location is available under the current sharing permission |

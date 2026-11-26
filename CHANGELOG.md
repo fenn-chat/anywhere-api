@@ -4,6 +4,10 @@ The agent API's changes, newest first. The version is `info.version` in
 [`openapi.json`](openapi.json); paths stay under `/v1` while every change is
 compatible.
 
+## 2.6.0
+
+- Agents can add, read, list, update and remove temporary lines on the person's map. Each line has an expiry and a private link. Pass its ID to `open_map` to show it on the person's phone.
+
 ## 2.5.1
 
 - **Limits (2026-11-23)**: a token makes 500 changes to the map a day (UTC),

@@ -23,8 +23,8 @@ chat. Anywhere records reads and changes under the connection's name. More in
    `Bearer anyw_pat_…`. Where Grok asks for a header, give exactly that
    name and value; where it asks for a bearer token or an API key, give the
    token alone.
-5. Save. Grok finds Anywhere's tools and uses them in your chats. The place
-   and tag tools change your map; `open_map` sends a notification to your
+5. Save. Grok finds Anywhere's tools and uses them in your chats. It can
+   change places, tags and temporary lines. `open_map` sends a notification to your
    phone. [The API guide](../README.md#tags-and-ratings) explains
    which changes have Undo.
 
@@ -38,6 +38,10 @@ the team.
 > Save Café de Flore as a place I want to go, with the note "hot chocolate".
 
 > How much time did I spend at work this week?
+
+> Draw this GPX track on my map until Sunday and give me the link.
+
+The line follows the coordinates you supply. [Temporary map lines](../README.md#draw-a-temporary-map-line).
 
 ## Grok through the xAI API
 

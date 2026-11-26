@@ -41,8 +41,12 @@ In a chat, Anywhere is among Claude's tools (the **+** menu, then
 **Connectors**). Ask, for example: "What are my favorite places on
 Anywhere?" or "Save Café de Flore in Paris to my want-to-go list." Claude
 reads without asking; it asks you before it changes your map (its place
-and tag tools are marked destructive). `open_map` sends a notification to
+and tag edits and line updates and removals are marked destructive). `open_map` sends a notification to
 your phone that opens the map there.
+
+With a route’s coordinates, ask “Draw this walk on my map until Sunday
+evening and link it here.” You can open its link or tap the line to see
+its details. [Temporary map lines](../README.md#draw-a-temporary-map-line).
 
 Anywhere lists the connection as **Claude** (your avatar, **Agents**), tells
 you what Claude did ("Claude added Café de Flore to your map"), and lets you

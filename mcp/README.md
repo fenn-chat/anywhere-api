@@ -21,7 +21,7 @@ Guides: [ChatGPT](chatgpt.md) · [Claude](claude.md) · [Muse](muse.md) ·
 | `get_me` | Who the person is (name, time zone), this token's limits and usage | read-only |
 | `list_places` | Searches the person's places: by tag, words, box, distance, change time | read-only |
 | `get_place` | One place: tags, label, note, origin, visit stats | read-only |
-| `add_place` | Saves a venue, with tags or none, and a note | changes the map |
+| `add_place` | Saves a venue or merges it into an existing pin | changes the map, destructive |
 | `update_place` | Changes a place's tags, note, name, label or rating | changes the map, destructive |
 | `remove_place` | Takes a saved place off the map | changes the map, destructive |
 | `list_visits` | Visits: in a range, to a place, or in a box | read-only |
@@ -29,7 +29,12 @@ Guides: [ChatGPT](chatgpt.md) · [Claude](claude.md) · [Muse](muse.md) ·
 | `list_trips` | Trips: when, from where to where, how, how far | read-only |
 | `get_history` | Visits and trips as one timeline | read-only |
 | `get_current_location` | Own or shared current location; optional `person_id` | read-only |
-| `open_map` | Sends a notification that opens a specified camera view, or a place with its panel (`place_id`), in Anywhere | sends a notification |
+| `open_map` | Sends a notification that opens a specified camera view, a place (`place_id`), or a line (`polyline_id`) with its panel, in Anywhere | sends a notification |
+| `add_polyline` | Draws a named line through supplied points, with an expiry and a private app link | changes the map |
+| `get_polyline` | Reads one active line, including its points and linked places | read-only |
+| `list_polylines` | Lists active line summaries with length and link, newest change first | read-only |
+| `update_polyline` | Changes a line’s name, description, color, points, linked places or expiry | changes the map, destructive |
+| `remove_polyline` | Deletes a line and keeps its linked places | changes the map, destructive |
 | `list_friends` | Friends, their sharing levels and available shared locations | read-only |
 | `list_calendar_events` | Own or shared calendar events, by time range; optional `person_id` | read-only |
 | `list_conversations` | Your chats, optionally filtered by `person_id` | read-only |
@@ -53,6 +58,12 @@ request to keep their important places current. See
 for seeding home, work and other known places, and
 [showing results on the phone](../README.md#show-map-results-on-your-phone)
 for what the current API can display.
+
+To [draw a temporary map line](../README.md#draw-a-temporary-map-line), call
+`add_polyline` with 2–500 ordered points and reuse the same `idempotency_key`
+on retries. Return its private `url`. Creation can notify the person. Use
+`open_map` with the `polyline_id` when they ask for another notification.
+Line reads, updates and removals appear in Activity without a push.
 
 Location, visit, trip and history reads also accept `person_id`. Shared
 data follows current sharing levels and blocks; chats require current
