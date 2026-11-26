@@ -278,7 +278,7 @@ Use `add_polyline` to draw a named line on the connected person’s map. Supply 
 
 The default expiry is 24 hours. Supply `expires_at` with a time zone for a different future deadline up to 30 days away. The name takes 1–100 UTF-16 code units and the optional plain-text `description` up to 2,000. Each ID in `place_ids` must identify a distinct saved or visited place on this account. Their order is the display order. The default `color` is `blue`. The other choices are `teal`, `green`, `orange`, `red`, and `purple`.
 
-Tapping the line focuses it and shows its details and linked places. **Show whole line** frames the path. **Recenter map** also includes the usual nearby map items. Removing the line or letting it expire keeps the linked places on the map.
+Tapping the line frames the whole path and highlights it with a thicker stroke. Its card shows the name, length, and a carousel of linked places. Use `update_polyline` to rename the line. The person can edit its note (`description`) on their phone or tap the trash icon to delete the line. Removing the line or letting it expire keeps the linked places on the map.
 
 Creation is eligible for the usual grouped activity notification. A notification about one new line opens its detail card. A group covering several lines or a mix of actions opens Activity. Reads, edits, renewals and removals appear in Activity quietly. The line is private to this account. Its URL stays the same across renames and geometry changes. Use the same `idempotency_key` (REST `Idempotency-Key`) to retry a creation.
 

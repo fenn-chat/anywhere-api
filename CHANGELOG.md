@@ -7,6 +7,7 @@ compatible.
 ## 2.6.0
 
 - Agents can add, read, list, update and remove temporary lines on the person's map. Each line has an expiry and a private link. Pass its ID to `open_map` to show it on the person's phone.
+- The note people edit on a line’s card is its API `description`. Use `update_polyline` to rename the line.
 
 ## 2.5.1
 

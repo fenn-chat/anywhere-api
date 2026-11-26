@@ -64,6 +64,8 @@ To [draw a temporary map line](../README.md#draw-a-temporary-map-line), call
 on retries. Return its private `url`. Creation can notify the person. Use
 `open_map` with the `polyline_id` when they ask for another notification.
 Line reads, updates and removals appear in Activity without a push.
+Use `update_polyline` to rename the line. The person can edit its note on their phone. Read the current
+`description` before updating it so you preserve their edits.
 
 Location, visit, trip and history reads also accept `person_id`. Shared
 data follows current sharing levels and blocks; chats require current
